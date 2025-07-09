@@ -1,6 +1,6 @@
 package com.chae.promo.auth.service;
 
-import com.chae.promo.common.jwt.JwtUtil;
+import com.chae.promo.common.jwt.JwtProvider;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -8,15 +8,15 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class AuthServiceImpl implements AuthService{
 
-    private final JwtUtil jwtUtil;
+    private final JwtProvider jwtProvider;
 
     @Override
     public String createAnonymousToken() {
-        return jwtUtil.generateAnonymousToken();
+        return jwtProvider.generateAnonymousToken();
     }
 
     @Override
     public String getAnonIdFromToken(String token) {
-        return jwtUtil.validateAndGetAnonId(token);
+        return jwtProvider.validateAndGetAnonId(token);
     }
 }

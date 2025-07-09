@@ -13,7 +13,7 @@ import java.util.Date;
 import java.util.UUID;
 
 @Component
-public class JwtUtil {
+public class JwtProvider {
     @Value("${jwt.secret}")
     private String jwtSecret;
 
@@ -47,11 +47,17 @@ public class JwtUtil {
 
     public Claims validateToken(String token) {
         try {
-            return Jwts.parserBuilder()
+            Claims claims = Jwts.parserBuilder()
                     .setSigningKey(secretKey)
                     .build()
                     .parseClaimsJws(token)
                     .getBody();
+
+            if (!"anonymous".equals(claims.getSubject())) {
+                throw new CommonCustomException(CommonErrorCode.JWT_INVALID);
+            }
+
+            return claims;
         } catch (ExpiredJwtException e) {
             throw new CommonCustomException(CommonErrorCode.JWT_EXPIRED);
         } catch (JwtException e) {
