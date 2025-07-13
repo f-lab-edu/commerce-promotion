@@ -1,5 +1,6 @@
 package com.chae.promo.common.jwt;
 
+import com.chae.promo.auth.domain.AuthProviderType;
 import com.chae.promo.exception.CommonCustomException;
 import com.chae.promo.exception.CommonErrorCode;
 import io.jsonwebtoken.*;
@@ -10,10 +11,9 @@ import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
 import java.util.Date;
-import java.util.UUID;
 
 @Component
-public class JwtProvider {
+public class JwtUtil {
     @Value("${jwt.secret}")
     private String jwtSecret;
 
