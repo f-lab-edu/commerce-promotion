@@ -1,6 +1,5 @@
 package com.chae.promo.common.jwt;
 
-import com.chae.promo.auth.domain.AuthProviderType;
 import com.chae.promo.exception.CommonCustomException;
 import com.chae.promo.exception.CommonErrorCode;
 import io.jsonwebtoken.*;
@@ -11,10 +10,8 @@ import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
 import java.util.Date;
+import java.util.UUID;
 
-/**
- * 토큰 생성, 서명, 파싱, 검증만 담당
- */
 @Component
 public class JwtProvider {
     @Value("${jwt.secret}")
@@ -83,17 +80,11 @@ public class JwtProvider {
         }
 
         try {
-            Claims claims = Jwts.parserBuilder()
+            return Jwts.parserBuilder()
                     .setSigningKey(secretKey)
                     .build()
                     .parseClaimsJws(token)
                     .getBody();
-
-            if (!"anonymous".equals(claims.getSubject())) {
-                throw new CommonCustomException(CommonErrorCode.JWT_INVALID);
-            }
-
-            return claims;
         } catch (ExpiredJwtException e) {
             throw new CommonCustomException(CommonErrorCode.JWT_EXPIRED);
         } catch (JwtException e) {
