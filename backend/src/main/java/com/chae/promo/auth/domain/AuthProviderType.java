@@ -14,15 +14,16 @@ public enum AuthProviderType {
     private final String value;
 
     /**
-     * 문자열 값을 통해 TokenType Enum을 찾아 반환
+     * 문자열 값을 통해 AuthProviderType Enum을 찾아 반환합니다.
      *
      * @param value JWT Claims의 subject 값 (예: "anonymous", "refresh_token")
-     * @return 해당 문자열 값에 대응하는 enum
-     * @throws IllegalArgumentException 유효하지 않은 subject 값일 경우
+     * @return 해당 문자열 값에 대응하는 Enum 상수
+     * @throws CommonCustomException 입력된 value가 null이거나,
+     * 해당하는 Enum 상수를 찾을 수 없을 경우 {@code CommonErrorCode.VALIDATION_FAILED}와 함께 발생
      */
     public static AuthProviderType fromValue(String value) {
         if (value == null) {
-            throw new IllegalArgumentException("");
+            throw new CommonCustomException(CommonErrorCode.VALIDATION_FAILED);
         }
 
         for (AuthProviderType type : AuthProviderType.values()) {
@@ -30,7 +31,7 @@ public enum AuthProviderType {
                 return type;
             }
         }
-        throw new CommonCustomException(CommonErrorCode.JWT_INVALID);
+        throw new CommonCustomException(CommonErrorCode.VALIDATION_FAILED);
     }
 
 }
