@@ -52,20 +52,18 @@ public class CouponServiceImpl implements CouponService {
 
         Coupon coupon = findCoupon(couponCode);
 
-        // Redis에 재고가 없으면 DB에서 불러와 캐시
-        initializeCouponCacheIfNeeded(coupon, couponStockKey, couponTtlKey);
-
-        // 쿠폰 만료 시간 계산 및 TTL (초) 계산
         LocalDateTime calculatedExpireAt;
         long ttlSeconds;
         try {
             calculatedExpireAt = getCouponExpirationDateTime(coupon);
             ttlSeconds = couponExpirationCalculator.calculateTtlSeconds(calculatedExpireAt);
-
         } catch (CommonCustomException e) {
             log.warn("쿠폰 만료일이 지났습니다. 발급 중단. couponCode: {}", couponCode);
             throw e;
         }
+
+        // Redis에 재고가 없으면 DB에서 불러와 캐시
+        initializeCouponCacheIfNeeded(coupon, couponStockKey, couponTtlKey, ttlSeconds);
 
         CouponRedisRequest couponRedisRequest = CouponRedisRequest.builder()
                 .coupon(coupon)
@@ -154,7 +152,7 @@ public class CouponServiceImpl implements CouponService {
     /**
      * 쿠폰 발급에 필요한 재고와 TTL 정보를 Redis에 설정
      */
-    private void initializeCouponCacheIfNeeded(Coupon coupon, String couponStockKey, String couponTtlKey) {
+    private void initializeCouponCacheIfNeeded(Coupon coupon, String couponStockKey, String couponTtlKey, long ttlSeconds) {
         //재고 키 확인 및 생성
         if (Boolean.FALSE.equals(couponRedisService.hasKey(couponStockKey))) {
             log.info("Redis에 쿠폰 재고 {}가 없습니다. DB에서 로드하여 캐시합니다.", couponStockKey);
@@ -165,10 +163,6 @@ public class CouponServiceImpl implements CouponService {
         //ttl 키 확인 및 생성
         if (Boolean.FALSE.equals(couponRedisService.hasKey(couponTtlKey))) {
             log.info("Redis에 쿠폰 TTL 키 [{}]가 없습니다. 만료 시간을 설정합니다.", couponTtlKey);
-
-            // 쿠폰 이벤트의 실제 종료 시점까지 남은 시간을 초 단위로 계산
-            LocalDateTime calculatedExpireAt = getCouponExpirationDateTime(coupon);
-            long ttlSeconds = couponExpirationCalculator.calculateTtlSeconds(calculatedExpireAt);
 
             // 남은 시간이 있는 경우에만 TTL 키 생성
             if (ttlSeconds > 0) {
