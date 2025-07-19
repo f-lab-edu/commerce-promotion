@@ -1,12 +1,13 @@
 package com.chae.promo.coupon.service.redis;
 
+import com.chae.promo.coupon.dto.CouponRedisRequest;
+import com.chae.promo.exception.CommonCustomException;
 import com.chae.promo.exception.CommonErrorCode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Service;
-import com.chae.promo.exception.CommonCustomException;
 
 import java.util.Arrays;
 import java.util.List;
@@ -17,27 +18,33 @@ import java.util.List;
 public class CouponRedisService {
     private final StringRedisTemplate stringRedisTemplate;
 
-
     // Redis 재고 차감 및 중복 발급 체크를 원자적으로 수행하는 Lua 스크립트
     // KEYS[1]: stockKey (재고 키)
     // KEYS[2]: userCouponKey (사용자-쿠폰 발급 상태 키)
+    // KEYS[3]: couponTtlKey (쿠폰 ttl 키)
     // ARGV[1]: userId (로깅용, Redis 명령에는 직접 사용 안 됨)
-    // ARGV[2]: ttlMillis (사용자-쿠폰 발급 상태 키의 TTL, 밀리초 단위)
+    // ARGV[2]: ttlSeconds (사용자-쿠폰 발급 상태 키의 TTL, 초 단위)
     // ARGV[3]: issueStatus (발급 상태 문자열, 예: "ISSUED")
     // 반환 값: 1 (성공), 2 (재고 소진), 3 (중복 발급), 0 (알 수 없는 오류)
     private static final String REDIS_ISSUE_COUPON_SCRIPT = """
             local couponStockKey = KEYS[1]
             local userCouponKey = KEYS[2]
+            local couponTtlKey = KEYS[3]
             local userId = ARGV[1]
             local ttlSeconds = tonumber(ARGV[2])
             local issueStatus = ARGV[3]
-
-            -- 1. 중복 발급 체크: 이미 발급된 쿠폰인지 확인
+                        
+            -- 1. 쿠폰 TTL 체크 : coupontTtlKey가 없으면(TTL 만료) 쿠폰 발급 불가
+            if redis.call('EXISTS', couponTtlKey) == 0 then
+                return 4 -- 쿠폰 기간 만료
+            end
+            
+            -- 2. 중복 발급 체크: 이미 발급된 쿠폰인지 확인
             if redis.call('EXISTS', userCouponKey) == 1 then
                 return 3 -- 중복 발급
             end
-
-            -- 2. 재고 차감: 현재 재고를 확인하고 0보다 클 경우에만 차감
+                        
+            -- 3. 재고 차감: 현재 재고를 확인하고 0보다 클 경우에만 차감
             local currentStock = redis.call('GET', couponStockKey)
             if not currentStock then
                 return  2-- 재고 키 없음 (재고 소진으로 간주)
@@ -46,10 +53,8 @@ public class CouponRedisService {
             if currentStock <= 0 then
                 return 2 -- 재고 소진
             end
-
-            local updateStock = redis.call('DECRBY', couponStockKey, 1)
-
-            -- 3. 발급 상태 저장: 재고 차감 성공 시에만 발급 상태 저장
+            
+            -- 4. 발급 상태 저장: 재고 차감 성공 시에만 발급 상태 저장
             if updateStock >= 0 then
                 redis.call('SET', userCouponKey, issueStatus)
                 if ttlSeconds > 0 then
@@ -57,6 +62,7 @@ public class CouponRedisService {
                 end
                 return 1 -- 성공
             end
+
 
             return 0 -- 알 수 없는 오류
             """;
@@ -66,19 +72,37 @@ public class CouponRedisService {
      * Redis Lua 스크립트를 사용하여 쿠폰 재고를 차감하고 사용자에게 발급
      * 원자적으로 실행
      *
-     * @param couponStockKey  쿠폰 재고를 관리하는 Redis 키
-     * @param userCouponKey   사용자에게 쿠폰이 발급되었음을 표시하는 Redis 키
-     * @param userId          사용자 ID (로깅 및 스크립트 ARGV 전달용)
-     * @param ttlSeconds       userCouponKey의 만료 시간 (초)
-     * @param issueStatus     발급 상태 문자열 (예: "ISSUED")
-     * */
-    public void issueCouponAtomically(String couponStockKey, String userCouponKey, String userId, long ttlSeconds, String issueStatus) {
-        List<String> keys = Arrays.asList(couponStockKey, userCouponKey);
-        String[] args = {userId, String.valueOf(ttlSeconds), issueStatus};
+     * @param couponRedisRequest 쿠폰 발급에 필요한 모든 정보를 담은 요청 객체
+     * 포함 정보:
+     * - couponStockKey: 쿠폰 재고를 관리하는 Redis 키
+     * - userCouponKey: 사용자에게 쿠폰 발급 상태를 표시하는 Redis 키
+     * - couponTtlKey: 쿠폰의 유효 기간을 나타내는 Redis 키 (이 키가 없으면 발급 불가)
+     * - userId: 사용자 ID (로깅 및 스크립트 ARGV 전달용)
+     * - ttlSeconds : userCouponKey의 만료 시간 (초)
+     * - couponIssueStatus: 발급 상태 Enum (예: ISSUED)
+     */
+    public void issueCouponAtomically(CouponRedisRequest couponRedisRequest) {
+
+
+        List<String> keys = Arrays.asList(
+                couponRedisRequest.getCouponStockKey(),
+                couponRedisRequest.getUserCouponKey(),
+                couponRedisRequest.getCouponTtlKey()
+        );
+        String[] args = {couponRedisRequest.getUserId(),
+                String.valueOf(couponRedisRequest.getTtlSeconds()),
+                couponRedisRequest.getCouponIssueStatus().getValue()
+        };
 
         Long result = stringRedisTemplate.execute(redisIssueCouponScript, keys, args);
 
-        handleRedisScriptResult(result, userId, couponStockKey, userCouponKey);
+        handleRedisScriptResult(
+                result,
+                couponRedisRequest.getUserId(),
+                couponRedisRequest.getCouponStockKey(),
+                couponRedisRequest.getUserCouponKey(),
+                couponRedisRequest.getCouponTtlKey()
+        );
     }
 
     /**
@@ -90,7 +114,11 @@ public class CouponRedisService {
      * @param userCouponKey 사용자 쿠폰 발급 키 (로깅용)
      * @throws CommonCustomException 스크립트 결과에 따른 예외
      */
-    private void handleRedisScriptResult(Long result, String userId, String couponStockKey, String userCouponKey) {
+    private void handleRedisScriptResult(Long result,
+                                         String userId,
+                                         String couponStockKey,
+                                         String userCouponKey,
+                                         String couponTtlKey) {
         if (result == null) {
             log.error("Redis 스크립트 실행 결과가 NULL입니다. user: {}, stockKey: {}, userCouponKey: {}", userId, couponStockKey, userCouponKey);
             throw new CommonCustomException(CommonErrorCode.COUPON_ISSUE_SAVE_FAIL);
@@ -106,6 +134,10 @@ public class CouponRedisService {
             case 3 -> { // 중복 발급
                 log.info("Redis: 쿠폰 중복 발급. userCouponKey: {}", userCouponKey);
                 throw new CommonCustomException(CommonErrorCode.COUPON_ALREADY_ISSUED);
+            }
+            case 4 -> { //쿠폰 유효기간 만료
+                log.info("Redis: TTL 만료. couponTtlKey: {}", couponTtlKey);
+                throw new CommonCustomException(CommonErrorCode.COUPON_EXPIRED);
             }
             default -> { // 기타 알 수 없는 오류
                 log.error("Redis: 알 수 없는 오류 발생. user: {}, stockKey: {}, userCouponKey: {}, result: {}", userId, couponStockKey, userCouponKey, result);
