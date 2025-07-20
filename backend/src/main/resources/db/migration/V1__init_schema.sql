@@ -1,4 +1,4 @@
-create table promo_db.coupons
+create table IF NOT EXISTS coupons
 (
     id             bigint auto_increment
         primary key,
@@ -19,7 +19,7 @@ create table promo_db.coupons
         unique (code)
 );
 
-create table promo_db.coupon_issue
+create table IF NOT EXISTS coupons
 (
     id         bigint auto_increment
         primary key,
