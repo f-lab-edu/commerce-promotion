@@ -23,6 +23,11 @@ spring:
         dialect: org.hibernate.dialect.MySQL8Dialect
         format_sql: true
 
+  flyway:
+    enabled: true  # Flyway 활성화 (기본값: true)
+    baseline-on-migrate: true # 이미 테이블이 있는 DB에 Flyway를 처음 적용할 때 사용
+    locations: classpath:db/migration # SQL 파일 위치 지정 (기본값)
+
 jwt:
   secret: ${JWT_SECRET:default-secret-key-c3VwZ5Rm9ySFM1Mj=}
   accessTokenExpiration: 3600 # 1시간 (초)
