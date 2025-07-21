@@ -15,7 +15,6 @@ import com.chae.promo.coupon.util.CouponExpirationCalculator;
 import com.chae.promo.exception.CommonCustomException;
 import com.chae.promo.exception.CommonErrorCode;
 import io.jsonwebtoken.Claims;
-import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataAccessException;
@@ -35,8 +34,8 @@ public class CouponServiceImpl implements CouponService {
     private final CouponRedisService couponRedisService;
     private final CouponExpirationCalculator couponExpirationCalculator;
     private final CouponRedisKeyManager couponRedisKeyManager;
+    private final CouponIssuePersistenceService couponIssuePersistenceService;
 
-    @Transactional
     @Override
     public CouponResponse.Issue issueCoupon(String token) throws CommonCustomException {
         //coupon id - 쿠폰 종류 1개만 있다고 가정
@@ -88,8 +87,8 @@ public class CouponServiceImpl implements CouponService {
             //쿠폰 publicId 생성 (uuid)
             String publicId = UuidUtil.generate();
 
-            //DB에 저장
-            CouponIssue issue = saveCouponIssue(coupon, userId, calculatedExpireAt, publicId);
+            //DB에 저장 - couponIssuePersistenceService로 위임
+            CouponIssue issue = couponIssuePersistenceService.saveCouponIssue(coupon, userId, calculatedExpireAt, publicId);
 
             return CouponResponse.Issue.builder()
                     .couponIssueId(issue.getPublicId()) // publicId로 노출
@@ -128,26 +127,26 @@ public class CouponServiceImpl implements CouponService {
                 });
     }
 
-    private CouponIssue saveCouponIssue(Coupon coupon,
-                                        String userId,
-                                        LocalDateTime expireAt,
-                                        String publicId) {
-
-        CouponIssue issue = CouponIssue.builder()
-                .coupon(coupon)
-                .userId(userId)
-                .issuedAt(LocalDateTime.now())
-                .expireAt(expireAt)
-                .status(CouponIssueStatus.ISSUED)
-                .publicId(publicId)
-                .build();
-
-
-        CouponIssue savedIssue = couponIssueRepository.save(issue);
-        log.info("쿠폰 발급 DB 저장 완료. userId: {}, couponCode: {}, couponIssueId: {}",
-                userId, coupon.getCode(), savedIssue.getId());
-        return savedIssue;
-    }
+//    private CouponIssue saveCouponIssue(Coupon coupon,
+//                                        String userId,
+//                                        LocalDateTime expireAt,
+//                                        String publicId) {
+//
+//        CouponIssue issue = CouponIssue.builder()
+//                .coupon(coupon)
+//                .userId(userId)
+//                .issuedAt(LocalDateTime.now())
+//                .expireAt(expireAt)
+//                .status(CouponIssueStatus.ISSUED)
+//                .publicId(publicId)
+//                .build();
+//
+//
+//        CouponIssue savedIssue = couponIssueRepository.save(issue);
+//        log.info("쿠폰 발급 DB 저장 완료. userId: {}, couponCode: {}, couponIssueId: {}",
+//                userId, coupon.getCode(), savedIssue.getId());
+//        return savedIssue;
+//    }
 
     /**
      * 쿠폰 발급에 필요한 재고와 TTL 정보를 Redis에 설정
