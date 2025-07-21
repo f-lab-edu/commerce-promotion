@@ -53,9 +53,10 @@ public class CouponServiceImpl implements CouponService {
 
         LocalDateTime calculatedExpireAt;
         long ttlSeconds;
+        LocalDateTime now = LocalDateTime.now(); //기준시점
         try {
             calculatedExpireAt = getCouponExpirationDateTime(coupon);
-            ttlSeconds = couponExpirationCalculator.calculateTtlSeconds(calculatedExpireAt);
+            ttlSeconds = couponExpirationCalculator.calculateTtlSeconds(calculatedExpireAt, now);
         } catch (CommonCustomException e) {
             log.warn("쿠폰 만료일이 지났습니다. 발급 중단. couponCode: {}", couponCode);
             throw e;
@@ -111,7 +112,8 @@ public class CouponServiceImpl implements CouponService {
     }
 
     private LocalDateTime getCouponExpirationDateTime(Coupon coupon) {
-        return couponExpirationCalculator.calculateExpiration(coupon);
+        LocalDateTime now = LocalDateTime.now();
+        return couponExpirationCalculator.calculateExpiration(coupon, now);
     }
 
     private String validateTokenAndExtractPrincipalId(String token) {
