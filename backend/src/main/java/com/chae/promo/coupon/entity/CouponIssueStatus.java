@@ -27,13 +27,11 @@ public enum CouponIssueStatus {
         if (value == null) {
             throw new CommonCustomException(CommonErrorCode.VALIDATION_FAILED);
         }
-
-        for (CouponIssueStatus status : CouponIssueStatus.values()) {
-            if (status.getValue().equals(value)) {
-                return status;
-            }
+        try {
+            return CouponIssueStatus.valueOf(value); //enum 이름과 값이 같을 때 valueOf()이 효율적 O(1)
+        } catch (IllegalArgumentException e ) {
+            // 일치하는 Enum 상수를 찾지 못했을 때의 예외 처리
+            throw new CommonCustomException(CommonErrorCode.VALIDATION_FAILED);
         }
-        // 일치하는 Enum 상수를 찾지 못했을 때의 예외 처리
-        throw new CommonCustomException(CommonErrorCode.VALIDATION_FAILED);
     }
 }

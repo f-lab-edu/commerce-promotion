@@ -25,13 +25,12 @@ public enum AuthProviderType {
         if (value == null) {
             throw new CommonCustomException(CommonErrorCode.VALIDATION_FAILED);
         }
-
-        for (AuthProviderType type : AuthProviderType.values()) {
-            if (type.getValue().equals(value)) {
-                return type;
-            }
+        try {
+            return AuthProviderType.valueOf(value); //enum 이름과 값이 같을 때 valueOf()이 효율적 O(1)
+        } catch (IllegalArgumentException e ) {
+            // 일치하는 Enum 상수를 찾지 못했을 때의 예외 처리
+            throw new CommonCustomException(CommonErrorCode.VALIDATION_FAILED);
         }
-        throw new CommonCustomException(CommonErrorCode.VALIDATION_FAILED);
     }
 
 }
