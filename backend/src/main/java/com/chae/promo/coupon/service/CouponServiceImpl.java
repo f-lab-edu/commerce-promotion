@@ -127,27 +127,6 @@ public class CouponServiceImpl implements CouponService {
                 });
     }
 
-//    private CouponIssue saveCouponIssue(Coupon coupon,
-//                                        String userId,
-//                                        LocalDateTime expireAt,
-//                                        String publicId) {
-//
-//        CouponIssue issue = CouponIssue.builder()
-//                .coupon(coupon)
-//                .userId(userId)
-//                .issuedAt(LocalDateTime.now())
-//                .expireAt(expireAt)
-//                .status(CouponIssueStatus.ISSUED)
-//                .publicId(publicId)
-//                .build();
-//
-//
-//        CouponIssue savedIssue = couponIssueRepository.save(issue);
-//        log.info("쿠폰 발급 DB 저장 완료. userId: {}, couponCode: {}, couponIssueId: {}",
-//                userId, coupon.getCode(), savedIssue.getId());
-//        return savedIssue;
-//    }
-
     /**
      * 쿠폰 발급에 필요한 재고와 TTL 정보를 Redis에 설정
      */
