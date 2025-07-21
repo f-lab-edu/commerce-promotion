@@ -33,3 +33,9 @@ logging:
     org.springframework.web: DEBUG
     org.hibernate.SQL: DEBUG
     org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "*" # 개발 시에는 "*"로 모든 엔드포인트를 열고, 운영 시에는 "health,metrics" 등 필요한 것만 지정
