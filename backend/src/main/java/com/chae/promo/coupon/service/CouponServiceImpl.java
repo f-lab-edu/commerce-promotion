@@ -155,7 +155,7 @@ public class CouponServiceImpl implements CouponService {
     private void initializeCouponStockFromDB(Coupon coupon, String couponStockKey) {
         // 실제 남은 재고 = 전체 수량 - 이미 발급된 수량
         long issuedCount = couponIssueRepository.countByCouponIdAndStatus(
-                coupon.getId(), CouponIssueStatus.ISSUED.getValue());
+                coupon.getId(), CouponIssueStatus.ISSUED);
 
         long remainingStock = Math.max(0, coupon.getTotalQuantity() - issuedCount);
 
