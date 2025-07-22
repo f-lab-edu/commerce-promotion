@@ -1,6 +1,6 @@
 package com.chae.promo.coupon.service;
 
-import com.chae.promo.common.jwt.JwtUtil;
+import com.chae.promo.security.JwtUtil;
 import com.chae.promo.common.util.UuidUtil;
 import com.chae.promo.coupon.dto.CouponResponse;
 import com.chae.promo.coupon.entity.Coupon;
@@ -35,12 +35,10 @@ public class CouponServiceImpl implements CouponService{
 
     @Transactional
     @Override
-    public CouponResponse.Issue issueCoupon(String token) {
+    public CouponResponse.Issue issueCoupon(String userId) {
         //coupon id - 쿠폰 종류 1개만 있다고 가정
         String couponCode = "LABUBUISCOMMING";
 
-        //토큰 검증 및 user id
-        String userId = validateTokenAndExtractPrincipalId(token);
         Coupon coupon = findCoupon(couponCode);
 
         //redis key

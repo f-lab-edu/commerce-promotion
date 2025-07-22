@@ -40,6 +40,8 @@ dependencies {
     implementation("org.flywaydb:flyway-mysql")
 
     runtimeOnly 'com.h2database:h2'
+    implementation 'org.springframework.boot:spring-boot-starter-security'
+
 
     compileOnly 'org.projectlombok:lombok'
     runtimeOnly 'com.mysql:mysql-connector-j'
