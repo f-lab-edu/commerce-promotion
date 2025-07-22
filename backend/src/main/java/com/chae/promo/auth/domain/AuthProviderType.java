@@ -1,7 +1,9 @@
 package com.chae.promo.auth.domain;
 
-import com.chae.promo.exception.CommonCustomException;
+import com.chae.promo.exception.AuthException;
 import com.chae.promo.exception.CommonErrorCode;
+import com.chae.promo.security.resolver.AnonymousUserPrincipalResolver;
+import com.chae.promo.security.resolver.UserPrincipalResolver;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 
@@ -9,9 +11,10 @@ import lombok.Getter;
 @AllArgsConstructor
 public enum AuthProviderType {
 
-    ANONYMOUS("anonymous");
+    ANONYMOUS("anonymous", new AnonymousUserPrincipalResolver());
 
     private final String value;
+    private final UserPrincipalResolver resolver;
 
     /**
      * 문자열 값을 통해 TokenType Enum을 찾아 반환
@@ -30,7 +33,11 @@ public enum AuthProviderType {
                 return type;
             }
         }
-        throw new CommonCustomException(CommonErrorCode.JWT_INVALID);
+        throw new AuthException(CommonErrorCode.UNSUPPORTED_AUTH_PROVIDER);
     }
 
+    // 자신의 전략(resolver)을 반환하는 메소드
+    public UserPrincipalResolver getResolver() {
+        return resolver;
+    }
 }
