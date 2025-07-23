@@ -41,9 +41,6 @@ public class CouponServiceImpl implements CouponService {
         //coupon id - 쿠폰 종류 1개만 있다고 가정
         String couponCode = "LABUBUISCOMMING";
 
-        //토큰 검증 및 user id
-        String userId = validateTokenAndExtractPrincipalId(token);
-
         // Redis Key 생성
         String couponStockKey = couponRedisKeyManager.getCouponStockKey(couponCode);
         String userCouponKey = couponRedisKeyManager.getUserCouponKey(userId, couponCode);
