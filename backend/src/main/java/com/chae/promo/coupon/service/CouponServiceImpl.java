@@ -1,12 +1,12 @@
 package com.chae.promo.coupon.service;
 
-import com.chae.promo.security.JwtUtil;
 import com.chae.promo.common.util.UuidUtil;
 import com.chae.promo.coupon.dto.CouponRedisRequest;
 import com.chae.promo.coupon.dto.CouponResponse;
 import com.chae.promo.coupon.entity.Coupon;
 import com.chae.promo.coupon.entity.CouponIssue;
 import com.chae.promo.coupon.entity.CouponIssueStatus;
+import com.chae.promo.coupon.mapper.CouponMapper;
 import com.chae.promo.coupon.repository.CouponIssueRepository;
 import com.chae.promo.coupon.repository.CouponRepository;
 import com.chae.promo.coupon.service.redis.CouponRedisKeyManager;
@@ -14,20 +14,18 @@ import com.chae.promo.coupon.service.redis.CouponRedisService;
 import com.chae.promo.coupon.util.CouponExpirationCalculator;
 import com.chae.promo.exception.CommonCustomException;
 import com.chae.promo.exception.CommonErrorCode;
-import io.jsonwebtoken.Claims;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class CouponServiceImpl implements CouponService {
-
-    private final JwtUtil jwtUtil;
     private final CouponRepository couponRepository;
     private final CouponIssueRepository couponIssueRepository;
 
@@ -35,6 +33,7 @@ public class CouponServiceImpl implements CouponService {
     private final CouponExpirationCalculator couponExpirationCalculator;
     private final CouponRedisKeyManager couponRedisKeyManager;
     private final CouponIssuePersistenceService couponIssuePersistenceService;
+    private final CouponMapper couponMapper;
 
     @Override
     public CouponResponse.Issue issueCoupon(String userId) {
@@ -113,11 +112,6 @@ public class CouponServiceImpl implements CouponService {
         return couponExpirationCalculator.calculateExpiration(coupon, now);
     }
 
-    private String validateTokenAndExtractPrincipalId(String token) {
-        Claims claims = jwtUtil.validateToken(token);
-        return claims.get("principalId", String.class);
-    }
-
     private Coupon findCoupon(String couponCode) {
         return couponRepository.findByCode(couponCode)
                 .orElseThrow(() -> {
@@ -163,4 +157,19 @@ public class CouponServiceImpl implements CouponService {
                 coupon.getCode(), coupon.getTotalQuantity(), issuedCount, remainingStock);
     }
 
+    @Override
+    public List<CouponResponse.Info> getAll() {
+        List<Coupon> coupons = couponRepository.findAll();
+
+        return couponMapper.toInfoListFromCoupons(coupons);
+    }
+
+    @Override
+    public List<CouponResponse.Info> getMyCoupons(String userId) {
+        //todo. redis 조회먼저 할 수 있도록 수정 -> 기존 쿠폰 키 형식 변경 필요
+
+        List<CouponIssue> couponIssues = couponIssueRepository.findByUserId(userId);
+
+        return couponMapper.toInfoListFromCouponIssues(couponIssues);
+    }
 }
