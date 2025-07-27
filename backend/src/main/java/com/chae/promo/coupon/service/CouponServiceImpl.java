@@ -4,9 +4,11 @@ import com.chae.promo.common.util.UuidUtil;
 import com.chae.promo.coupon.dto.CouponRedisRequest;
 import com.chae.promo.coupon.dto.CouponResponse;
 import com.chae.promo.coupon.entity.Coupon;
+import com.chae.promo.coupon.entity.CouponIssue;
 import com.chae.promo.coupon.entity.CouponIssueStatus;
 import com.chae.promo.coupon.event.CouponEventPublisher;
 import com.chae.promo.coupon.event.CouponIssuedEvent;
+import com.chae.promo.coupon.mapper.CouponMapper;
 import com.chae.promo.coupon.repository.CouponIssueRepository;
 import com.chae.promo.coupon.repository.CouponRepository;
 import com.chae.promo.coupon.service.redis.CouponRedisKeyManager;
@@ -20,6 +22,7 @@ import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Slf4j
 @Service
@@ -32,6 +35,7 @@ public class CouponServiceImpl implements CouponService {
     private final CouponExpirationCalculator couponExpirationCalculator;
     private final CouponRedisKeyManager couponRedisKeyManager;
     private final CouponEventPublisher couponEventPublisher;
+    private final CouponMapper couponMapper;
 
     @Override
     public CouponResponse.Issue issueCoupon(String userId) {
@@ -167,4 +171,19 @@ public class CouponServiceImpl implements CouponService {
                 coupon.getCode(), coupon.getTotalQuantity(), issuedCount, remainingStock);
     }
 
+    @Override
+    public List<CouponResponse.Info> getAll() {
+        List<Coupon> coupons = couponRepository.findAll();
+
+        return couponMapper.toInfoListFromCoupons(coupons);
+    }
+
+    @Override
+    public List<CouponResponse.Info> getMyCoupons(String userId) {
+        //todo. redis 조회먼저 할 수 있도록 수정 -> 기존 쿠폰 키 형식 변경 필요
+
+        List<CouponIssue> couponIssues = couponIssueRepository.findByUserId(userId);
+
+        return couponMapper.toInfoListFromCouponIssues(couponIssues);
+    }
 }
