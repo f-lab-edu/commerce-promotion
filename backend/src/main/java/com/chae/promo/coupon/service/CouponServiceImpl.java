@@ -19,10 +19,12 @@ import com.chae.promo.exception.CommonErrorCode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataAccessException;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Set;
 
 @Slf4j
 @Service
@@ -36,6 +38,8 @@ public class CouponServiceImpl implements CouponService {
     private final CouponRedisKeyManager couponRedisKeyManager;
     private final CouponEventPublisher couponEventPublisher;
     private final CouponMapper couponMapper;
+
+    private final StringRedisTemplate redisTemplate;
 
     @Override
     public CouponResponse.Issue issueCoupon(String userId, String couponId) {
@@ -180,10 +184,33 @@ public class CouponServiceImpl implements CouponService {
 
     @Override
     public List<CouponResponse.Info> getMyCoupons(String userId) {
-        //todo. redis 조회먼저 할 수 있도록 수정 -> 기존 쿠폰 키 형식 변경 필요
+        String userCouponSetKey = couponRedisKeyManager.getUserCouponSetKey(userId);
 
-        List<CouponIssue> couponIssues = couponIssueRepository.findByUserId(userId);
+        Set<String> couponIds = redisTemplate.opsForSet().members(userCouponSetKey);
 
-        return couponMapper.toInfoListFromCouponIssues(couponIssues);
+        // Redis에 쿠폰 ID 목록이 있는 경우
+        if (couponIds != null && !couponIds.isEmpty()) {
+            log.info("Cache Hit - 유저 쿠폰 정보 redis 조회 userId: {}", userId);
+
+            List<Coupon> coupons = couponRepository.findByPublicIdIn(couponIds);
+            return couponMapper.toInfoListFromCoupons(coupons);
+        }
+
+        //Redis에 정보가 없는 경우 DB에서 조회
+        log.info("Cache Miss - 유저 쿠폰 정보 userId: {}. db 조회 시작 ", userId);
+        List<CouponIssue> couponIssuesFromDb = couponIssueRepository.findByUserId(userId);
+
+        if (!couponIssuesFromDb.isEmpty()) {
+            // CouponIssue 리스트에서 couponId만 추출
+            List<String> idsToCache = couponIssuesFromDb.stream()
+                    .map(issue -> issue.getCoupon().getPublicId())
+                    .toList();
+
+            // Redis Set에 추가
+            redisTemplate.opsForSet().add(userCouponSetKey, idsToCache.toArray(new String[0]));
+            log.info("Cache - redis에 사용자 쿠폰 캐시 저장 userId: {}", userId);
+        }
+
+        return couponMapper.toInfoListFromCouponIssues(couponIssuesFromDb);
     }
 }
