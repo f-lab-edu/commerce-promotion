@@ -18,8 +18,18 @@ public enum CommonErrorCode {
     COUPON_OUT_OF_STOCK(HttpStatus.CONFLICT, "COUPON_OUT_OF_STOCK", "쿠폰이 소진되었습니다."),
     COUPON_NOT_FOUND(HttpStatus.NOT_FOUND, "COUPON_NOT_FOUND", "존재하지 않는 쿠폰입니다."),
     COUPON_ISSUE_SAVE_FAIL(HttpStatus.INTERNAL_SERVER_ERROR, "COUPON_ISSUE_SAVE_FAIL", "쿠폰 발급 처리 중 오류가 발생했습니다."),
-    COUPON_ISSUE_DATA_ACCESS_FAIL(HttpStatus.INTERNAL_SERVER_ERROR, "COUPON_ISSUE_DATA_ACCESS_FAIL", "쿠폰 발급 처리 중 오류가 발생했습니다.")
+    COUPON_ISSUE_DATA_ACCESS_FAIL(HttpStatus.INTERNAL_SERVER_ERROR, "COUPON_ISSUE_DATA_ACCESS_FAIL", "쿠폰 발급 처리 중 오류가 발생했습니다."),
 
+    //주문
+    PRODUCT_NOT_FOUND(HttpStatus.NOT_FOUND, "PRODUCT_NOT_FOUND", "요청하신 상품을 찾을 수 없습니다."),
+    PRODUCT_NOT_FOR_SALE(HttpStatus.BAD_REQUEST, "PRODUCT_NOT_FOR_SALE", "현재 판매하지 않는 상품입니다."),
+    INVALID_PRODUCT_CODE(HttpStatus.BAD_REQUEST, "INVALID_PRODUCT_CODE", "유효하지 않은 상품 코드입니다."),
+    PRODUCT_SOLD_OUT(HttpStatus.BAD_REQUEST, "STOCK_SOLD_OUT", "상품 재고가 부족합니다."),
+    PRODUCT_STOCK_NOT_FOUND(HttpStatus.NOT_FOUND, "PRODUCT_STOCK_NOT_FOUND", "상품 재고 정보를 찾을 수 없습니다."),
+
+
+    //redis
+    REDIS_OPERATION_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "REDIS_OPERATION_FAILED", "Redis 작업 중 오류가 발생했습니다."),
     ;
 
     CommonErrorCode(HttpStatus httpStatus, String code, String message) {
