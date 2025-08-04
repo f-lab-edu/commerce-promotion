@@ -2,9 +2,7 @@ package com.chae.promo.order.entity;
 
 import com.chae.promo.common.entity.BaseTime;
 import jakarta.persistence.*;
-import lombok.AccessLevel;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -14,6 +12,8 @@ import java.util.List;
 @Table(name = "orders")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
+@AllArgsConstructor(access = AccessLevel.PRIVATE)
+@Builder
 public class Order extends BaseTime {
 
     @Id
@@ -36,6 +36,19 @@ public class Order extends BaseTime {
     @Column(nullable = false, length = 20)
     private OrderStatus status; // 주문 상태
 
+    @Builder.Default
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL)
     private List<OrderItem> orderItems = new ArrayList<>(); // 주문 상품 목록
+
+    public void addOrderItem(OrderItem orderItem) {
+        this.orderItems.add(orderItem);
+
+        // 양방향 연관관계 설정
+        orderItem.setOrder(this);
+    }
+
+    // 총액 업데이트 메서드
+    public void updateTotalPrice(BigDecimal totalPrice){
+        this.totalPrice = totalPrice;
+    }
 }
