@@ -30,7 +30,8 @@ public class Product extends BaseTime{
     @Column(nullable = false)
     private long stockQuantity; // 재고 수량
 
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
-    private String status; // 상품 상태 (FOR_SALE, SOLD_OUT 등)
+    private ProductStatus status; // 상품 상태 (FOR_SALE, SOLD_OUT 등)
 
 }
