@@ -3,6 +3,7 @@ package com.chae.promo.order.controller;
 import com.chae.promo.order.dto.OrderRequest;
 import com.chae.promo.order.dto.OrderResponse;
 import com.chae.promo.order.service.OrderService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -22,7 +23,7 @@ public class OrderController {
 
     @PostMapping("/purchase")
     public ResponseEntity<OrderResponse.Purchase> purchase(
-            @RequestBody OrderRequest.Purchase request,
+            @RequestBody @Valid OrderRequest.Purchase request,
             @AuthenticationPrincipal UserDetails userDetails
     ) {
 
