@@ -34,4 +34,7 @@ public class Product extends BaseTime{
     @Column(nullable = false, length = 20)
     private ProductStatus status; // 상품 상태 (FOR_SALE, SOLD_OUT 등)
 
+    @Version
+    @Column(nullable = false)
+    private Long version;
 }
