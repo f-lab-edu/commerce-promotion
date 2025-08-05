@@ -7,6 +7,6 @@ package com.chae.promo.common.kafka;
 public final class TopicNames {
     public static final String COUPON_ISSUED = "coupon.issued";
 
-    public static final String PURCHASE_REQUEST = "order.purchase.request";
+    public static final String ORDER_PLACED = "order.placed";
 
 }
