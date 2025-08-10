@@ -21,8 +21,7 @@ public class ProductBulkRepository {
         String sql = """
             UPDATE products 
             SET stock_quantity = stock_quantity - ?,
-                version = version + 1,
-                updated_at = CURRENT_TIMESTAMP
+                version = version + 1
             WHERE id = ? AND version = ? AND stock_quantity >= ?
             """;
 
