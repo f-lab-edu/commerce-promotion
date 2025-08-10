@@ -34,5 +34,15 @@ public class OrderResponse {
         private BigDecimal totalPrice; // 총 가격 (price * quantity)
     }
 
+    @Getter
+    @Setter
+    @AllArgsConstructor
+    @NoArgsConstructor
+    @Builder
+    public static class OrderSummary{
+        private String publicId; // 주문 공개 ID
+        private BigDecimal totalPrice; // 총 결제 금액
+        private String status; // 주문 상태
+    }
 
 }

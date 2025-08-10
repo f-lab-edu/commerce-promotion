@@ -21,6 +21,7 @@ public class OrderController {
     private final OrderService orderService;
 
 
+    //결제 완료 이후 재고 차감 todo.엔드포인트 변경({orderId}/purchase)
     @PostMapping("/purchase")
     public ResponseEntity<OrderResponse.Purchase> purchase(
             @RequestBody @Valid OrderRequest.Purchase request,
@@ -28,5 +29,15 @@ public class OrderController {
     ) {
 
         return ResponseEntity.ok(orderService.placeOrder(request, userDetails.getUsername()));
+    }
+
+    //주문 요청
+    @PostMapping
+    public ResponseEntity<OrderResponse.OrderSummary> createOrder(
+            @RequestBody @Valid OrderRequest.Create request,
+            @AuthenticationPrincipal UserDetails userDetails
+    ) {
+
+        return ResponseEntity.ok(orderService.createOrder(request, userDetails.getUsername()));
     }
 }

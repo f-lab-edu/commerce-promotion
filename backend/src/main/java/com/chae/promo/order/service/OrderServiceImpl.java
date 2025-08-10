@@ -4,14 +4,12 @@ import com.chae.promo.common.util.UuidUtil;
 import com.chae.promo.exception.CommonCustomException;
 import com.chae.promo.order.dto.OrderRequest;
 import com.chae.promo.order.dto.OrderResponse;
-import com.chae.promo.order.entity.Order;
-import com.chae.promo.order.entity.OrderItem;
-import com.chae.promo.order.entity.OrderStatus;
-import com.chae.promo.order.entity.UserType;
+import com.chae.promo.order.entity.*;
 import com.chae.promo.order.event.OrderPlacedEvent;
 import com.chae.promo.order.event.OrderPlacedEventPublisher;
 import com.chae.promo.order.mapper.OrderMapper;
 import com.chae.promo.order.repository.OrderRepository;
+import com.chae.promo.order.repository.ShippingInfoRepository;
 import com.chae.promo.order.service.redis.StockRedisKeyManager;
 import com.chae.promo.order.service.redis.StockRedisService;
 import com.chae.promo.product.entity.Product;
@@ -35,6 +33,7 @@ public class OrderServiceImpl implements OrderService {
     private final OrderPlacedEventPublisher orderPlacedEventPublisher;
     private final ProductValidator productValidator;
     private final OrderMapper orderMapper;
+    private final ShippingInfoRepository shippingInfoRepository;
 
     @Transactional
     @Override
@@ -47,7 +46,7 @@ public class OrderServiceImpl implements OrderService {
         //상품 유효성 검증
         Map<String, Product> productMap = validateAndGetProductMap(request);
 
-        //주문 생성 및 저장
+        //주문 생성 및 저장 todo. order 상태 변경 로직으로 수정 예정
         Order order = createAndSaveOrder(request, ordererName, productMap);
 
         //redis 재고 차감
@@ -147,6 +146,90 @@ public class OrderServiceImpl implements OrderService {
                 .build();
 
         orderPlacedEventPublisher.publishOrderPlaced(event);
+    }
+
+
+    @Transactional
+    @Override
+    public OrderResponse.OrderSummary createOrder(OrderRequest.Create request, String userId) {
+        //현재 비회원명 임시 사용
+        UserType userType = UserType.GUEST;
+        String ordererName = "비회원 " + userId;
+
+        //상품 유효성 검증
+        Map<String, Product> productMap = validateAndGetProductMap(request);
+
+        //주문 생성 및 저장
+        Order order = createAndSaveOrder(request, ordererName, productMap);
+
+        //배송 정보 저장
+        createAndSaveShippingInfo(order, request.getShippingInfo());
+
+        return OrderResponse.OrderSummary.builder()
+                .publicId(order.getPublicId())
+                .totalPrice(order.getTotalPrice())
+                .status(order.getStatus().name())
+                .build();
+    }
+
+    private Map<String, Product> validateAndGetProductMap(OrderRequest.Create request){
+        // 요청된 상품 코드로 Product 엔티티를 한번에 조회하고, Map으로 변환
+        try {
+            return productValidator.getAndValidateProductMap(
+                    request.getPurchaseItems().getItems(),
+                    OrderRequest.PurchaseItem::getProductCode,
+                    OrderRequest.PurchaseItem::getQuantity
+            );
+
+        } catch (CommonCustomException e) {
+            log.warn("상품 유효성 검증 실패: {}", e.getMessage());
+            throw e;
+        }
+    }
+
+    private Order createAndSaveOrder(OrderRequest.Create request, String ordererName, Map<String, Product> productMap){
+        Order order = Order.builder()
+                .customerId(null)
+                .ordererName(ordererName)
+                .publicId(UuidUtil.generate())
+                .status(OrderStatus.PENDING_PAYMENT) // 초기 상태는 결제 대기
+                .build();
+
+        BigDecimal totalPrice = BigDecimal.ZERO;
+
+        for (OrderRequest.PurchaseItem item : request.getPurchaseItems().getItems()) {
+            Product product = productMap.get(item.getProductCode());
+
+            OrderItem orderItem = OrderItem.builder()
+                    .product(product)
+                    .quantity(item.getQuantity())
+                    .unitPrice(product.getPrice())
+                    .build();
+
+            order.addOrderItem(orderItem);
+
+            //총 금액 계산 (단가 * 수량)
+            totalPrice = totalPrice.add(
+                    product.getPrice().multiply(new BigDecimal(item.getQuantity()))
+            );
+        }
+
+        order.updateTotalPrice(totalPrice);
+
+        return orderRepository.save(order);
+    }
+
+    private ShippingInfo createAndSaveShippingInfo(Order order, OrderRequest.ShippingInfo shippingInfoRequest) {
+        ShippingInfo shippingInfo = ShippingInfo.builder()
+                .order(order)
+                .recipientName(shippingInfoRequest.getRecipientName())
+                .zipcode(shippingInfoRequest.getZipcode())
+                .address(shippingInfoRequest.getAddress())
+                .phoneNumber(shippingInfoRequest.getPhoneNumber())
+                .memo(shippingInfoRequest.getMemo())
+                .build();
+
+        return shippingInfoRepository.save(shippingInfo);
     }
 
 }
