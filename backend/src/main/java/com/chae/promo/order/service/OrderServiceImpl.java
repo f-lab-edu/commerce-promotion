@@ -4,6 +4,7 @@ import com.chae.promo.common.util.UuidUtil;
 import com.chae.promo.exception.CommonCustomException;
 import com.chae.promo.order.dto.OrderRequest;
 import com.chae.promo.order.dto.OrderResponse;
+import com.chae.promo.order.dto.PurchaseItemDTO;
 import com.chae.promo.order.entity.*;
 import com.chae.promo.order.event.OrderPlacedEvent;
 import com.chae.promo.order.event.OrderPlacedEventPublisher;
@@ -63,8 +64,8 @@ public class OrderServiceImpl implements OrderService {
         try {
             return productValidator.getAndValidateProductMap(
                     request.getItems(),
-                    OrderRequest.PurchaseItem::getProductCode,
-                    OrderRequest.PurchaseItem::getQuantity
+                    PurchaseItemDTO::getProductCode,
+                    PurchaseItemDTO::getQuantity
             );
 
         } catch (CommonCustomException e) {
@@ -83,7 +84,7 @@ public class OrderServiceImpl implements OrderService {
 
         BigDecimal totalPrice = BigDecimal.ZERO;
 
-        for (OrderRequest.PurchaseItem item : request.getItems()) {
+        for (PurchaseItemDTO item : request.getItems()) {
             Product product = productMap.get(item.getProductCode());
 
             OrderItem orderItem = OrderItem.builder()
@@ -105,8 +106,8 @@ public class OrderServiceImpl implements OrderService {
         return orderRepository.save(order);
     }
 
-    private void decreaseStockInRedis(List<OrderRequest.PurchaseItem> items){
-        for (OrderRequest.PurchaseItem item : items) {
+    private void decreaseStockInRedis(List<PurchaseItemDTO> items){
+        for (PurchaseItemDTO item : items) {
             String productStockKey = stockRedisKeyManager.getProductStockKey(item.getProductCode());
             long requestedQuantity = item.getQuantity();
 
@@ -153,7 +154,6 @@ public class OrderServiceImpl implements OrderService {
     @Override
     public OrderResponse.OrderSummary createOrder(OrderRequest.Create request, String userId) {
         //현재 비회원명 임시 사용
-        UserType userType = UserType.GUEST;
         String ordererName = "비회원 " + userId;
 
         //상품 유효성 검증
@@ -176,9 +176,9 @@ public class OrderServiceImpl implements OrderService {
         // 요청된 상품 코드로 Product 엔티티를 한번에 조회하고, Map으로 변환
         try {
             return productValidator.getAndValidateProductMap(
-                    request.getPurchaseItems().getItems(),
-                    OrderRequest.PurchaseItem::getProductCode,
-                    OrderRequest.PurchaseItem::getQuantity
+                    request.getItems(),
+                    PurchaseItemDTO::getProductCode,
+                    PurchaseItemDTO::getQuantity
             );
 
         } catch (CommonCustomException e) {
@@ -197,7 +197,7 @@ public class OrderServiceImpl implements OrderService {
 
         BigDecimal totalPrice = BigDecimal.ZERO;
 
-        for (OrderRequest.PurchaseItem item : request.getPurchaseItems().getItems()) {
+        for (PurchaseItemDTO item : request.getItems()) {
             Product product = productMap.get(item.getProductCode());
 
             OrderItem orderItem = OrderItem.builder()
