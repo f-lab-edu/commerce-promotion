@@ -40,6 +40,9 @@ public class Order extends BaseTime {
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL)
     private List<OrderItem> orderItems = new ArrayList<>(); // 주문 상품 목록
 
+    @Column(nullable = false, length = 100)
+    private String productName;
+
     public void addOrderItem(OrderItem orderItem) {
         this.orderItems.add(orderItem);
 
@@ -51,4 +54,8 @@ public class Order extends BaseTime {
     public void updateTotalPrice(BigDecimal totalPrice){
         this.totalPrice = totalPrice;
     }
+
+    // 주문 상태 변경 메서드
+    public void markPaid() { this.status = OrderStatus.PAID; }
+    public void markPendingPayment() { this.status = OrderStatus.PENDING_PAYMENT; }
 }

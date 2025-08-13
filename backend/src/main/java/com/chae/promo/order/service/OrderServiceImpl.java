@@ -169,6 +169,7 @@ public class OrderServiceImpl implements OrderService {
                 .publicId(order.getPublicId())
                 .totalPrice(order.getTotalPrice())
                 .status(order.getStatus().name())
+                .itemCount(order.getOrderItems().size())
                 .build();
     }
 
@@ -188,11 +189,14 @@ public class OrderServiceImpl implements OrderService {
     }
 
     private Order createAndSaveOrder(OrderRequest.Create request, String ordererName, Map<String, Product> productMap){
+        String productName = extractProductName(request.getItems(), productMap);
+
         Order order = Order.builder()
                 .customerId(null)
                 .ordererName(ordererName)
                 .publicId(UuidUtil.generate())
-                .status(OrderStatus.PENDING_PAYMENT) // 초기 상태는 결제 대기
+                .status(OrderStatus.CREATED) // 초기 상태는 주문 생성
+                .productName(productName)
                 .build();
 
         BigDecimal totalPrice = BigDecimal.ZERO;
@@ -230,6 +234,34 @@ public class OrderServiceImpl implements OrderService {
                 .build();
 
         return shippingInfoRepository.save(shippingInfo);
+    }
+
+    // 주문 상품명 추출 및 가공
+    private String extractProductName(List<PurchaseItemDTO> items, Map<String, Product> productMap) {
+        int PRODUCT_NAME_LIMIT = 100;
+
+        if (items == null || items.isEmpty()) return "상품 없음";
+
+        // 첫 상품명
+        Product first = productMap.get(items.get(0));
+        String firstName = (first != null && first.getName() != null) ? first.getName().trim() : "상품";
+
+        // “외 N건” = (품목 수 - 1)
+        int extra = Math.max(0, items.size() - 1);
+        String suffix = (extra > 0) ? " 외 " + extra + "건" : "";
+
+        // 100자 제한
+        int baseLimit = Math.max(0, PRODUCT_NAME_LIMIT - suffix.codePointCount(0, suffix.length()));
+        String head = limitByCodePoints(firstName, baseLimit);
+        String name = head + suffix;
+
+        return name;
+    }
+
+    private static String limitByCodePoints(String s, int max) {
+        if (s == null || max <= 0) return "";
+        int end = s.offsetByCodePoints(0, Math.min(max, s.codePointCount(0, s.length())));
+        return s.substring(0, end); // count<=max면 end == s.length()
     }
 
 }
