@@ -1,10 +1,10 @@
 package com.chae.promo.product.repository;
 
 import com.chae.promo.product.dto.ProductRequest;
-import jakarta.persistence.OptimisticLockException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Repository;
 
 import java.util.Arrays;
@@ -42,8 +42,8 @@ public class ProductBulkRepository {
                 log.warn("재고 업데이트 실패 - productId:{}, requestedVersion:{}, requestedDecreasedStock:{}",
                         failedUpdate.getProductId(), failedUpdate.getVersion(), failedUpdate.getDecreasedStock());
 
-                throw new OptimisticLockException(
-                        "재고 업데이트 실패 - productId: " + failedUpdate.getProductId());
+                throw new ObjectOptimisticLockingFailureException(
+                        "재고 업데이트 실패 - productId: ", failedUpdate.getProductId());
             }
         }
 

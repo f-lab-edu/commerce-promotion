@@ -2,10 +2,10 @@ package com.chae.promo.order.event;
 
 import com.chae.promo.common.kafka.TopicNames;
 import com.chae.promo.exception.CommonCustomException;
-import jakarta.persistence.OptimisticLockException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.kafka.annotation.DltHandler;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.annotation.RetryableTopic;
@@ -29,7 +29,7 @@ public class OrderPlacedEventConsumer {
             autoCreateTopics = "false", // 자동으로 토픽을 생성하지 않음
             exclude = { // 재시도 제외 exception
                     CommonCustomException.class,
-                    OptimisticLockException.class,
+                    OptimisticLockingFailureException.class,
                     DataIntegrityViolationException.class
             }
     )
@@ -47,7 +47,7 @@ public class OrderPlacedEventConsumer {
                           @Header(KafkaHeaders.EXCEPTION_MESSAGE) String errorMessage) {
 
         // 재시도가 의미 없는 예외인지 확인
-        boolean isBusinessException = exceptionClassName.equals(OptimisticLockException.class.getName()) ||
+        boolean isBusinessException = exceptionClassName.equals(OptimisticLockingFailureException.class.getName()) ||
                 exceptionClassName.equals(CommonCustomException.class.getName()) ||
                 exceptionClassName.equals(DataIntegrityViolationException.class.getName());
 

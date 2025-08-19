@@ -5,6 +5,7 @@ import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 import java.math.BigDecimal;
 
@@ -27,6 +28,7 @@ public class Product extends BaseTime{
     @Column(nullable = false, precision = 13)
     private BigDecimal price; // 상품 가격
 
+    @Setter
     @Column(nullable = false)
     private long stockQuantity; // 재고 수량
 

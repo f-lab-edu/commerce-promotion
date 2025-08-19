@@ -8,11 +8,15 @@ import com.chae.promo.product.entity.ProductStockAudit;
 import com.chae.promo.product.repository.ProductBulkRepository;
 import com.chae.promo.product.repository.ProductStockAuditRepository;
 import com.chae.promo.product.util.ProductValidator;
-import jakarta.persistence.OptimisticLockException;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.OptimisticLockingFailureException;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import org.springframework.retry.annotation.Backoff;
+import org.springframework.retry.annotation.Recover;
+import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -28,6 +32,11 @@ public class OrderPlacedHandlerService {
     private final ProductValidator productValidator;
 
 
+    @Retryable(
+            value = OptimisticLockingFailureException.class,
+            maxAttempts = 3,
+            backoff = @Backoff(delay = 100, multiplier = 2, maxDelay = 1000, random = true)
+    )
     @Transactional
     public void processProductStockChange(OrderPlacedEvent event) {
 
@@ -44,15 +53,20 @@ public class OrderPlacedHandlerService {
         } catch (CommonCustomException e) {
             log.warn("비즈니스 로직 검증 실패 - eventId: {}, error: {}", event.getEventId(), e.getMessage());
             throw e; //재시도 제외 예외
-        } catch (OptimisticLockException e) {
+        } catch (ObjectOptimisticLockingFailureException e) {
             log.warn("재고 업데이트 실패 - OptimisticLockException 발생. eventId: {}, userId: {}, itemList: {}",
                     event.getEventId(), event.getUserId(), itemList);
-            throw e; //재시도 제외 예외
+            throw e; //재시도 제외 예외 : 서비스 레벨에서 처리
+        } catch (DataIntegrityViolationException e) {
+            // 재시도할 필요 없는 예외는 DLT로 바로 전송
+            log.warn("Audit 저장 실패 (데이터 무결성 위반). eventId: {}, userId: {}, e: {}",
+                    event.getEventId(), event.getUserId(), e.getMessage());
+            throw new CommonCustomException(CommonErrorCode.PRODUCT_STOCK_AUDIT_SAVE_FAILED);
         } catch (Exception e) {
             log.error("DB 저장 실패로 인한 재처리 요청. eventId: {}", event.getEventId(), e);
 
             // Spring Kafka의 재시도(Retry) 및 DLQ(Dead Letter Queue) 메커니즘을 활성화하는 역할
-            throw new RuntimeException("DB 저장 실패로 인한 재처리 요청", e);
+            throw e;
         }
     }
 
@@ -104,25 +118,18 @@ public class OrderPlacedHandlerService {
                 .toList();
 
         // DB 재고 차감 및 audit 저장
-        try {
-            productBulkRepository.bulkUpdateStock(bulkUpdates);
-            productStockAuditRepository.saveAll(audits);
+//        try {
+        productBulkRepository.bulkUpdateStock(bulkUpdates);
+        productStockAuditRepository.saveAll(audits);
 
-            log.info("DB 재고 차감 및 audit 기록 성공. eventId: {}, orderPublicId: {}, userId: {}, 처리된 상품 수: {}",
-                    event.getEventId(), event.getOrderPublicId(), event.getUserId(), itemList.size());
+        log.info("DB 재고 차감 및 audit 기록 성공. eventId: {}, orderPublicId: {}, userId: {}, 처리된 상품 수: {}",
+                event.getEventId(), event.getOrderPublicId(), event.getUserId(), itemList.size());
 
-        } catch (DataIntegrityViolationException e) {
-            // 재시도할 필요 없는 예외는 DLT로 바로 전송
-            log.warn("Audit 저장 실패 (데이터 무결성 위반). eventId: {}, userId: {}, e: {}",
-                    event.getEventId(), event.getUserId(), e.getMessage());
-            throw new CommonCustomException(CommonErrorCode.PRODUCT_STOCK_AUDIT_SAVE_FAILED);
+    }
 
-        } catch (Exception e) {
-            // 그 외 모든 예외 (네트워크 오류, DB 타임아웃 등)는 재시도가 필요
-            log.error("Audit 저장 중 예외 발생. eventId: {}, userId: {}, e: {}",
-                    event.getEventId(), event.getUserId(), e.getMessage());
-            // RuntimeException을 던져 @RetryableTopic이 재시도하도록 함
-            throw new RuntimeException("Audit 저장 실패로 인한 재처리 요청", e);
-        }
+    @Recover
+    public void recover(OptimisticLockingFailureException e, OrderPlacedEvent event) {
+        log.error("최대 재시도 초과 - eventId: {}", event.getEventId(), e);
+        throw e; // 재시도 실패 시 예외를 던져 DLT로 전송되도록 함
     }
 }
