@@ -129,7 +129,7 @@ public class PaymentServiceImpl implements PaymentService {
                 paymentMethod = PaymentMethod.fromValue(detail.primaryPayMeans());
             }
 
-            default -> throw new IllegalArgumentException("unsupported pg");
+            default -> throw new CommonCustomException(CommonErrorCode.PAYMENT_NOT_SUPPORTED_PG_TYPE);
         }
 
 

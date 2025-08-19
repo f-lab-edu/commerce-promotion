@@ -1,5 +1,6 @@
 package com.chae.promo.payment.controller;
 
+import com.chae.promo.payment.dto.ApproveResult;
 import com.chae.promo.payment.dto.PaymentRequest;
 import com.chae.promo.payment.service.PaymentService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -24,13 +25,13 @@ public class PaymentController {
 
     @PostMapping
     @Operation(summary = "결제 요청")
-    public ResponseEntity<Void> requestPayment(
+    public ResponseEntity<ApproveResult> requestPayment(
             @RequestBody @Valid PaymentRequest request,
             @AuthenticationPrincipal UserDetails userDetails
     ) {
 
-        paymentService.approve(request, userDetails.getUsername());
-        return ResponseEntity.ok().build();
+        ApproveResult result = paymentService.approve(request, userDetails.getUsername());
+        return ResponseEntity.ok(result);
     }
 
 
