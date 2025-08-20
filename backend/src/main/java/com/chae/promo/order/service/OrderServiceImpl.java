@@ -20,6 +20,8 @@ import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -49,12 +51,27 @@ public class OrderServiceImpl implements OrderService {
 
         //주문 생성 및 저장
         Order order = createAndSaveOrder(request, ordererName, productMap);
+        orderRepository.flush();
 
-        //redis 재고 차감
-        decreaseStockInRedis(request.getItems());
+        // 재고 예약
+        String orderId = order.getPublicId();
+        reserveStockInRedis(request.getItems(), orderId);
 
-        //kafka 이벤트 발행
-        publishOrderPlacedEvent(order, request, userId, userType);
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                //kafka 이벤트 발행
+                publishOrderPlacedEvent(order, request, userId, userType);
+            }
+            @Override
+            public void afterCompletion(int status) {
+                if( status == TransactionSynchronization.STATUS_ROLLED_BACK) {
+                    // 주문이 롤백되면 Redis 예약 취소
+                    cancelStockInRedisQuietly(request.getItems(), orderId);
+                }
+            }
+        });
+
 
         return orderMapper.toPurchaseResponse(order);
     }
@@ -106,26 +123,47 @@ public class OrderServiceImpl implements OrderService {
         return orderRepository.save(order);
     }
 
-    private void decreaseStockInRedis(List<OrderRequest.PurchaseItem> items){
+//    private void decreaseStockInRedis(List<OrderRequest.PurchaseItem> items){
+//        for (OrderRequest.PurchaseItem item : items) {
+//            String productStockKey = stockRedisKeyManager.getProductStockKey(item.getProductCode());
+//            long requestedQuantity = item.getQuantity();
+//
+//            try {
+//                // Redis Lua 스크립트를 통해 재고를 원자적으로 차감 시도
+//                stockRedisService.decreaseStockAtomically(productStockKey, requestedQuantity);
+//
+//            } catch (CommonCustomException e) {
+//                log.warn("Redis 재고 차감 실패 (비즈니스 예외). productCode:{}, quantity:{}, e:{}",
+//                        item.getProductCode(), requestedQuantity, e.getMessage());
+//                throw e;
+//            } catch (RuntimeException e) {
+//                log.error("Redis 재고 차감 중 RuntimeException 발생: {}", e.getMessage(), e);
+//                throw e;
+//            } catch (Exception e) {
+//                log.error("Redis 재고 차감 중 예상치 못한 오류 발생. productCode:{}, e: {}",
+//                        item.getProductCode(), e);
+//                throw new RuntimeException("Redis 재고 차감 중 알 수 없는 오류가 발생했습니다.");
+//            }
+//        }
+//    }
+
+    private void reserveStockInRedis(List<OrderRequest.PurchaseItem> items, String orderId){
+        long ttlSec = 60 * 10; // 10분 TTL
         for (OrderRequest.PurchaseItem item : items) {
-            String productStockKey = stockRedisKeyManager.getProductStockKey(item.getProductCode());
             long requestedQuantity = item.getQuantity();
 
             try {
                 // Redis Lua 스크립트를 통해 재고를 원자적으로 차감 시도
-                stockRedisService.decreaseStockAtomically(productStockKey, requestedQuantity);
+                stockRedisService.reserve(item.getProductCode(), orderId , requestedQuantity, ttlSec);
 
             } catch (CommonCustomException e) {
-                log.warn("Redis 재고 차감 실패 (비즈니스 예외). productCode:{}, quantity:{}, e:{}",
-                        item.getProductCode(), requestedQuantity, e.getMessage());
-                throw e;
-            } catch (RuntimeException e) {
-                log.error("Redis 재고 차감 중 RuntimeException 발생: {}", e.getMessage(), e);
+                log.warn("Redis 재고 예약 실패 (비즈니스 예외). productCode:{}, orderId: {}, quantity:{}, e:{}",
+                        item.getProductCode(), orderId, requestedQuantity, e.getMessage());
                 throw e;
             } catch (Exception e) {
-                log.error("Redis 재고 차감 중 예상치 못한 오류 발생. productCode:{}, e: {}",
-                        item.getProductCode(), e);
-                throw new RuntimeException("Redis 재고 차감 중 알 수 없는 오류가 발생했습니다.");
+                log.error("Redis 재고 차감 중 예상치 못한 오류 발생. orderId:{}, e: {}",
+                        orderId, e);
+                throw new RuntimeException("Redis 재고 예약 중 알 수 없는 오류가 발생했습니다.");
             }
         }
     }
@@ -149,4 +187,15 @@ public class OrderServiceImpl implements OrderService {
         orderPlacedEventPublisher.publishOrderPlaced(event);
     }
 
+    private void cancelStockInRedisQuietly(List<OrderRequest.PurchaseItem> items, String orderId) {
+        for (var item : items) {
+            try {
+                stockRedisService.cancel(item.getProductCode(), orderId, item.getQuantity());
+            } catch (Exception ex) {
+                // 멱등/보상 성격이므로 조용히 로그만
+                log.warn("Redis 예약 취소 중 오류(무시) productCode: {}, orderId: {}, err: {}",
+                        item.getProductCode(), orderId, ex.toString());
+            }
+        }
+    }
 }
