@@ -59,3 +59,8 @@ logging:
     org.springframework.kafka: WARN
     org.springframework.kafka.listener: WARN
     org.springframework.kafka.core: WARN
+
+app:
+  redis:
+    prefix: promo:dev
+    use-hashtag: true # Redis 해시태그 사용 설정
