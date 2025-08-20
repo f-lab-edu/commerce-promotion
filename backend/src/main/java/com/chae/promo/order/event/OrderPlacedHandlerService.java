@@ -118,9 +118,12 @@ public class OrderPlacedHandlerService {
                 .toList();
 
         // DB 재고 차감 및 audit 저장
-//        try {
+        // DB 재고 차감 (JDBC)
         productBulkRepository.bulkUpdateStock(bulkUpdates);
+
+        //Audit 저장 (JPA) + 조기 검증을 위한 flush
         productStockAuditRepository.saveAll(audits);
+        productStockAuditRepository.flush();
 
         log.info("DB 재고 차감 및 audit 기록 성공. eventId: {}, orderPublicId: {}, userId: {}, 처리된 상품 수: {}",
                 event.getEventId(), event.getOrderPublicId(), event.getUserId(), itemList.size());
