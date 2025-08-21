@@ -12,7 +12,6 @@ import com.chae.promo.order.event.OrderPlacedEvent;
 import com.chae.promo.order.event.OrderPlacedEventPublisher;
 import com.chae.promo.order.mapper.OrderMapper;
 import com.chae.promo.order.repository.OrderRepository;
-import com.chae.promo.order.service.redis.StockRedisKeyManager;
 import com.chae.promo.order.service.redis.StockRedisService;
 import com.chae.promo.product.entity.Product;
 import com.chae.promo.product.util.ProductValidator;
@@ -32,11 +31,12 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class OrderServiceImpl implements OrderService {
     private final OrderRepository orderRepository;
-    private final StockRedisKeyManager stockRedisKeyManager;
     private final StockRedisService stockRedisService;
     private final OrderPlacedEventPublisher orderPlacedEventPublisher;
     private final ProductValidator productValidator;
     private final OrderMapper orderMapper;
+    private static final long redisHoldTtlSec = 60 * 10; // 10분 TTL
+
 
     @Transactional
     @Override
@@ -96,7 +96,7 @@ public class OrderServiceImpl implements OrderService {
                 .customerId(null)
                 .ordererName(ordererName)
                 .publicId(UuidUtil.generate())
-                .status(OrderStatus.PENDING_PAYMENT) // 초기 상태는 결제 대기
+                .status(OrderStatus.CREATED) // 초기 상태는 결제 대기
                 .build();
 
         BigDecimal totalPrice = BigDecimal.ZERO;
@@ -123,38 +123,13 @@ public class OrderServiceImpl implements OrderService {
         return orderRepository.save(order);
     }
 
-//    private void decreaseStockInRedis(List<OrderRequest.PurchaseItem> items){
-//        for (OrderRequest.PurchaseItem item : items) {
-//            String productStockKey = stockRedisKeyManager.getProductStockKey(item.getProductCode());
-//            long requestedQuantity = item.getQuantity();
-//
-//            try {
-//                // Redis Lua 스크립트를 통해 재고를 원자적으로 차감 시도
-//                stockRedisService.decreaseStockAtomically(productStockKey, requestedQuantity);
-//
-//            } catch (CommonCustomException e) {
-//                log.warn("Redis 재고 차감 실패 (비즈니스 예외). productCode:{}, quantity:{}, e:{}",
-//                        item.getProductCode(), requestedQuantity, e.getMessage());
-//                throw e;
-//            } catch (RuntimeException e) {
-//                log.error("Redis 재고 차감 중 RuntimeException 발생: {}", e.getMessage(), e);
-//                throw e;
-//            } catch (Exception e) {
-//                log.error("Redis 재고 차감 중 예상치 못한 오류 발생. productCode:{}, e: {}",
-//                        item.getProductCode(), e);
-//                throw new RuntimeException("Redis 재고 차감 중 알 수 없는 오류가 발생했습니다.");
-//            }
-//        }
-//    }
-
     private void reserveStockInRedis(List<OrderRequest.PurchaseItem> items, String orderId){
-        long ttlSec = 60 * 10; // 10분 TTL
         for (OrderRequest.PurchaseItem item : items) {
             long requestedQuantity = item.getQuantity();
 
             try {
                 // Redis Lua 스크립트를 통해 재고를 원자적으로 차감 시도
-                stockRedisService.reserve(item.getProductCode(), orderId , requestedQuantity, ttlSec);
+                stockRedisService.reserve(item.getProductCode(), orderId , requestedQuantity, redisHoldTtlSec);
 
             } catch (CommonCustomException e) {
                 log.warn("Redis 재고 예약 실패 (비즈니스 예외). productCode:{}, orderId: {}, quantity:{}, e:{}",
