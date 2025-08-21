@@ -1,5 +1,6 @@
 package com.chae.promo.order.service;
 
+import com.chae.promo.common.kafka.TopicNames;
 import com.chae.promo.common.util.UuidUtil;
 import com.chae.promo.exception.CommonCustomException;
 import com.chae.promo.order.dto.OrderRequest;
@@ -9,10 +10,10 @@ import com.chae.promo.order.entity.OrderItem;
 import com.chae.promo.order.entity.OrderStatus;
 import com.chae.promo.order.entity.UserType;
 import com.chae.promo.order.event.OrderPlacedEvent;
-import com.chae.promo.order.event.OrderPlacedEventPublisher;
 import com.chae.promo.order.mapper.OrderMapper;
 import com.chae.promo.order.repository.OrderRepository;
 import com.chae.promo.order.service.redis.StockRedisService;
+import com.chae.promo.outbox.service.OutboxService;
 import com.chae.promo.product.entity.Product;
 import com.chae.promo.product.util.ProductValidator;
 import jakarta.transaction.Transactional;
@@ -32,10 +33,11 @@ import java.util.Map;
 public class OrderServiceImpl implements OrderService {
     private final OrderRepository orderRepository;
     private final StockRedisService stockRedisService;
-    private final OrderPlacedEventPublisher orderPlacedEventPublisher;
     private final ProductValidator productValidator;
     private final OrderMapper orderMapper;
     private static final long redisHoldTtlSec = 60 * 10; // 10분 TTL
+
+    private final OutboxService outboxService;
 
 
     @Transactional
@@ -57,12 +59,10 @@ public class OrderServiceImpl implements OrderService {
         String orderId = order.getPublicId();
         reserveStockInRedis(request.getItems(), orderId);
 
+        //outbox 이벤트 큐에 주문 완료 이벤트 저장 - 같은 트랜잭션 내
+        enqueueOrderPlacedOutbox(order, request, userId, userType);
+
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-            @Override
-            public void afterCommit() {
-                //kafka 이벤트 발행
-                publishOrderPlacedEvent(order, request, userId, userType);
-            }
             @Override
             public void afterCompletion(int status) {
                 if( status == TransactionSynchronization.STATUS_ROLLED_BACK) {
@@ -143,7 +143,7 @@ public class OrderServiceImpl implements OrderService {
         }
     }
 
-    private void publishOrderPlacedEvent(Order order, OrderRequest.Purchase request, String userId, UserType userType) {
+    private void enqueueOrderPlacedOutbox(Order order, OrderRequest.Purchase request, String userId, UserType userType) {
         List<OrderPlacedEvent.Item> eventItems = request.getItems().stream()
                 .map(item -> OrderPlacedEvent.Item.builder()
                         .productCode(item.getProductCode())
@@ -151,15 +151,22 @@ public class OrderServiceImpl implements OrderService {
                         .build())
                 .toList();
 
+        String eventId = UuidUtil.generate();
+
         OrderPlacedEvent event = OrderPlacedEvent.builder()
-                .eventId(UuidUtil.generate())
+                .eventId(eventId)
                 .userId(userId)
                 .userType(userType)
                 .orderPublicId(order.getPublicId())
                 .items(eventItems)
                 .build();
 
-        orderPlacedEventPublisher.publishOrderPlaced(event);
+        outboxService.saveEvent(
+                eventId,
+                TopicNames.ORDER_PLACED,
+                order.getPublicId(),
+                event
+        );
     }
 
     private void cancelStockInRedisQuietly(List<OrderRequest.PurchaseItem> items, String orderId) {
@@ -173,4 +180,5 @@ public class OrderServiceImpl implements OrderService {
             }
         }
     }
+
 }
