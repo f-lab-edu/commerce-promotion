@@ -2,10 +2,7 @@ package com.chae.promo.product.entity;
 
 import com.chae.promo.common.entity.BaseTime;
 import jakarta.persistence.*;
-import lombok.AccessLevel;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
+import lombok.*;
 
 import java.math.BigDecimal;
 
@@ -39,4 +36,15 @@ public class Product extends BaseTime{
     @Version
     @Column(nullable = false)
     private Long version;
+
+    @Builder
+    public Product(Long id, String code, String name, BigDecimal price, long stockQuantity, ProductStatus status, Long version) {
+        this.id = id;
+        this.code = code;
+        this.name = name;
+        this.price = price;
+        this.stockQuantity = stockQuantity;
+        this.status = status;
+        this.version = version;
+    }
 }
