@@ -40,7 +40,7 @@ public class RedisScriptConfig {
     //ARGV[1]=qty, ARGV[2]=ttlSec, ARGV[3]=nowMillis
     public static final String STOCK_RESERVE_SCRIPT = """
             
-            local available = tonumber(redis.call('GET', KEYS[1]) or '0')
+            local available = tonumber(redis.call('GET', KEYS[1]))
             if available == nil then
               return -2
             end
@@ -55,7 +55,7 @@ public class RedisScriptConfig {
             local ttl = tonumber(ARGV[2])
             local now = tonumber(ARGV[3])
                         
-            if (avail - reserved) < qty then
+            if (available - reserved) < qty then
               return -1
             end
                         
@@ -86,8 +86,11 @@ public class RedisScriptConfig {
               return -3
             end
                         
+            -- reserved 차감 + available 차감
             redis.call('DECRBY', KEYS[2], qty)
             redis.call('DECRBY', KEYS[1], qty)
+            
+            -- hold 삭제 + 인덱스 제거
             redis.call('DEL', KEYS[3])
             redis.call('ZREM', KEYS[4], KEYS[3])
                         
@@ -104,6 +107,8 @@ public class RedisScriptConfig {
             if reserved >= qty then
               redis.call('DECRBY', KEYS[1], qty)
             end
+            
+            -- hold 삭제 + 인덱스 제거
             redis.call('DEL', KEYS[2])
             redis.call('ZREM', KEYS[3], KEYS[2])
             return 1
