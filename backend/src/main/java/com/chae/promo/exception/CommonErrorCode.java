@@ -29,6 +29,8 @@ public enum CommonErrorCode {
     INSUFFICIENT_STOCK(HttpStatus.BAD_REQUEST, "INSUFFICIENT_STOCK", "요청 수량만큼 재고가 충분하지 않습니다."),
     PRODUCT_STOCK_AUDIT_SAVE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "PRODUCT_STOCK_AUDIT_SAVE_FAILED", "상품 재고 감사 기록을 저장하는 중 오류가 발생했습니다."),
     INVALID_QUANTITY(HttpStatus.BAD_REQUEST, "INVALID_QUANTITY", "유효하지않은 수량입니다."),
+    ORDER_NOT_FOUND(HttpStatus.NOT_FOUND, "ORDER_NOT_FOUND", "해당 주문을 찾을 수 없습니다."),
+
 
     //redis
     REDIS_OPERATION_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "REDIS_OPERATION_FAILED", "Redis 작업 중 오류가 발생했습니다."),

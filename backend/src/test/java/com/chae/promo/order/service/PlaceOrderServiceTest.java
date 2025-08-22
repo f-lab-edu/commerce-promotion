@@ -170,9 +170,9 @@ public class PlaceOrderServiceTest {
         // 롤백 후 afterCompletion(status=ROLLED_BACK)에서 cancel()이 호출되어야 함
         // → placeOrder 호출이 예외로 끝난 뒤 검증해야 취소 콜백까지 처리 완료
         then(stockRedisService).should(times(1))
-                .cancel(eq("P-300"), anyString(), eq(5L));
+                .cancel(eq("P-300"), anyString());
         then(stockRedisService).should(times(1))
-                .cancel(eq("P-400"), anyString(), eq(1L));
+                .cancel(eq("P-400"), anyString());
 
 
     }
@@ -222,7 +222,7 @@ public class PlaceOrderServiceTest {
 
         // 보상 취소 없음
         then(stockRedisService).should(never())
-                .cancel(anyString(), anyString(), anyLong());
+                .cancel(anyString(), anyString());
     }
 
 

@@ -78,12 +78,12 @@ public class StockRedisService {
     }
 
     /** 확정 (DB 커밋 후 afterCommit에서 호출 권장) */
-    public void confirm(String sku, String orderId, long quantity) {
-
-        if (quantity <= 0) {
-            log.warn("확정할 수량이 0 이하입니다. sku: {}, orderId: {}, quantity: {}", sku, orderId, quantity);
-            throw new CommonCustomException(CommonErrorCode.INVALID_QUANTITY);
-        }
+    /**
+     * hold된 재고량을 기준으로 재고 차감 확정
+     * @param sku
+     * @param orderId
+     */
+    public void confirm(String sku, String orderId) {
 
         String kAvail = key.available(sku);
         String kResv  = key.reserved(sku);
@@ -92,8 +92,7 @@ public class StockRedisService {
 
         Long result = stringRedisTemplate.execute(
                 confirmScript,
-                List.of(kAvail, kResv, kHold, kIndex),
-                String.valueOf(quantity)
+                List.of(kAvail, kResv, kHold, kIndex)
         );
         if (result == null) {
             log.error("Redis : null 반환. sku: {}", sku);
@@ -102,14 +101,14 @@ public class StockRedisService {
 
         switch (result.intValue()){
             case 1 -> { // 확정 성공
-                log.info("Redis: 예약 확정 성공. sku: {}, orderId: {}, quantity: {}", sku, orderId, quantity);
+                log.info("Redis: 예약 확정 성공. sku: {}, orderId: {}", sku, orderId);
             }
             case -4 -> { // hold 없음(만료)
                 log.info("Redis: hold 없음(만료). sku: {}, orderId: {}", sku, orderId);
                 throw new CommonCustomException(CommonErrorCode.REDIS_STOCK_HOLD_MISSING_OR_EXPIRED);
             }
             case -3 -> { // 예약 부족
-                log.info("Redis: 예약 개수 부족. sku: {}, orderId: {}, quantity: {}", sku, orderId, quantity);
+                log.info("Redis: 예약 개수 부족. sku: {}, orderId: {}", sku, orderId);
                 throw new IllegalStateException("예약 개수 부족");
             }
             default -> {
@@ -121,8 +120,7 @@ public class StockRedisService {
     }
 
     /** 취소 (DB 실패/롤백/만료 정리 등) */
-    public void cancel(String sku, String orderId, long quantity) {
-        if (quantity <= 0) return; // 멱등: 취소할 게 없으면 무시
+    public void cancel(String sku, String orderId) {
 
         String kResv  = key.reserved(sku);
         String kHold  = key.hold(sku, orderId);
@@ -130,8 +128,7 @@ public class StockRedisService {
 
         Long result = stringRedisTemplate.execute(
                 cancelScript,
-                List.of(kResv, kHold, kIndex),
-                String.valueOf(quantity)
+                List.of(kResv, kHold, kIndex)
         );
 
         if (result == null) {
@@ -142,7 +139,7 @@ public class StockRedisService {
         if (result != 1L) {
             log.warn("Redis: 예상치 못한 취소 오류. code: {}, sku: {}, orderId: {}", result, sku, orderId);
         } else {
-            log.info("Redis: 예약 취소 완료. sku:{}, orderId:{}, qty:{}", sku, orderId, quantity);
+            log.info("Redis: 예약 취소 완료. sku:{}, orderId:{}", sku, orderId);
         }
     }
 }

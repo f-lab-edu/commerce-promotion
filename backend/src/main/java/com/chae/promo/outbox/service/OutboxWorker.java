@@ -35,7 +35,7 @@ public class OutboxWorker {
         return Duration.ofSeconds(10L * Math.max(1, retryCount + 1));
     }
 
-    @Scheduled(fixedDelayString = "PT30S") // 5초마다 실행
+    @Scheduled(fixedDelayString = "PT5S") // 5초마다 실행
     @Transactional
     public void publishBatch() {
         LocalDateTime now = LocalDateTime.now(clock);
