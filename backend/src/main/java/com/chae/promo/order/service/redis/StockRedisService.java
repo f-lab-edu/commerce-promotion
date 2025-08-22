@@ -2,8 +2,8 @@ package com.chae.promo.order.service.redis;
 
 import com.chae.promo.exception.CommonCustomException;
 import com.chae.promo.exception.CommonErrorCode;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Service;
@@ -13,54 +13,29 @@ import java.util.List;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor
 @Validated
 public class StockRedisService {
     private final StringRedisTemplate stringRedisTemplate;
-    private final DefaultRedisScript<Long> redisDecreaseStockScript;
     private final DefaultRedisScript<Long> reserveScript;
+
     private final DefaultRedisScript<Long> confirmScript;
+
     private final DefaultRedisScript<Long> cancelScript;
     private final StockRedisKeyManager key;
 
-
-//    public void decreaseStockAtomically(
-//            @NotBlank String productStockKey,
-//            @Positive long requestedCount
-//    ) {
-//
-//        Long result = stringRedisTemplate.execute(
-//                redisDecreaseStockScript,
-//                Collections.singletonList(productStockKey),
-//                String.valueOf(requestedCount)
-//        );
-//
-//        handleRedisScriptResult(result, productStockKey, requestedCount);
-//    }
-//
-//    private void handleRedisScriptResult(Long result,
-//                                         String productStockKey,
-//                                         long requestedCount) {
-//
-//        if (result == null) {
-//            log.error("Redis : null 반환. productStockKey: {}", productStockKey);
-//            throw new RuntimeException("Redis 장애");
-//        }
-//
-//        switch (result.intValue()) {
-//            case -2 -> {// 재고키 없음
-//                log.info("Redis: 재고 키 없음. productStockKey: {}", productStockKey);
-//                throw new CommonCustomException(CommonErrorCode.PRODUCT_STOCK_NOT_FOUND);
-//            }
-//            case -1 -> { // 재고 부족
-//                log.info("Redis: 상품 재고 부족. productStockKey: {}, requestedCount: {}", productStockKey, requestedCount);
-//                throw new CommonCustomException(CommonErrorCode.PRODUCT_SOLD_OUT);
-//            }
-//            default ->  // 성공
-//                log.info("Redis: 상품 재고 차감 성공. productStockKey: {}, requestedCount: {}, remainingStock: {}", productStockKey, requestedCount, result);
-//        }
-//    }
-//
+    public StockRedisService(
+            StringRedisTemplate stringRedisTemplate,
+            @Qualifier("reserveStockScript") DefaultRedisScript<Long> reserveScript,
+            @Qualifier("confirmStockScript") DefaultRedisScript<Long> confirmScript,
+            @Qualifier("cancelStockScript") DefaultRedisScript<Long> cancelScript,
+            StockRedisKeyManager key
+    ) {
+        this.stringRedisTemplate = stringRedisTemplate;
+        this.reserveScript = reserveScript;
+        this.confirmScript = confirmScript;
+        this.cancelScript = cancelScript;
+        this.key = key;
+    }
 
 
     public void reserve(String sku, String orderId, long quantity, long ttlSec) {
