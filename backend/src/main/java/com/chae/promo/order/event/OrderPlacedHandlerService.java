@@ -2,6 +2,10 @@ package com.chae.promo.order.event;
 
 import com.chae.promo.exception.CommonCustomException;
 import com.chae.promo.exception.CommonErrorCode;
+import com.chae.promo.order.entity.Order;
+import com.chae.promo.order.entity.OrderStatus;
+import com.chae.promo.order.repository.OrderRepository;
+import com.chae.promo.order.service.redis.StockRedisService;
 import com.chae.promo.product.dto.ProductRequest;
 import com.chae.promo.product.entity.Product;
 import com.chae.promo.product.entity.ProductStockAudit;
@@ -30,6 +34,8 @@ public class OrderPlacedHandlerService {
     private final ProductStockAuditRepository productStockAuditRepository;
     private final ProductBulkRepository productBulkRepository;
     private final ProductValidator productValidator;
+    private final OrderRepository orderRepository;
+    private final StockRedisService stockRedisService;
 
 
     @Retryable(
@@ -49,6 +55,13 @@ public class OrderPlacedHandlerService {
 
             //상품 재고 변경 및 audit 기록
             applyStockChangeAndSaveAudit(event, itemList, productMap);
+
+            //order 상태 변경 (PENDING_PAYMENT)
+            markOrderPendingPayment(event.getOrderPublicId());
+
+            //redis 재고 확정
+            confirmStockInRedis(itemList, event.getOrderPublicId());
+
 
         } catch (CommonCustomException e) {
             log.warn("비즈니스 로직 검증 실패 - eventId: {}, error: {}", event.getEventId(), e.getMessage());
@@ -134,5 +147,18 @@ public class OrderPlacedHandlerService {
     public void recover(OptimisticLockingFailureException e, OrderPlacedEvent event) {
         log.error("최대 재시도 초과 - eventId: {}", event.getEventId(), e);
         throw e; // 재시도 실패 시 예외를 던져 DLT로 전송되도록 함
+    }
+
+    private void markOrderPendingPayment(String orderPublicId){
+        Order order = orderRepository.findByPublicId(orderPublicId)
+                .orElseThrow(() -> new CommonCustomException(CommonErrorCode.ORDER_NOT_FOUND));
+
+        order.setStatus(OrderStatus.PENDING_PAYMENT);
+    }
+
+    private void confirmStockInRedis(List<OrderPlacedEvent.Item> itemList, String orderPublicId){
+        itemList.forEach(item ->
+                stockRedisService.confirm(item.getProductCode(), orderPublicId)
+        );
     }
 }

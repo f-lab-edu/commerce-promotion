@@ -32,6 +32,7 @@ public class Order extends BaseTime {
     @Column(nullable = false, precision = 13)
     private BigDecimal totalPrice; // 총 결제 금액
 
+    @Setter
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private OrderStatus status; // 주문 상태
