@@ -175,7 +175,7 @@ public class OrderServiceImpl implements OrderService {
     private void cancelStockInRedisQuietly(List<OrderRequest.PurchaseItem> items, String orderId) {
         for (var item : items) {
             try {
-                stockRedisService.cancel(item.getProductCode(), orderId, item.getQuantity());
+                stockRedisService.cancel(item.getProductCode(), orderId);
             } catch (Exception ex) {
                 // 멱등/보상 성격이므로 조용히 로그만
                 log.warn("Redis 예약 취소 중 오류(무시) productCode: {}, orderId: {}, err: {}",
