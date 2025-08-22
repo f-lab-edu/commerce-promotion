@@ -11,5 +11,5 @@ CREATE TABLE IF NOT EXISTS event_outbox (
     updated_at     DATETIME(3) NOT NULL,
     last_error     VARCHAR(512),
     KEY idx_status_next (status, next_retry_at, id),        -- 기본 재시도 스캔 인덱스
-    KEY idx_next (next_retry_at, id),
+    KEY idx_next (next_retry_at, id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
