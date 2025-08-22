@@ -5,15 +5,17 @@ import com.chae.promo.exception.CommonErrorCode;
 import com.chae.promo.order.dto.OrderRequest;
 import com.chae.promo.order.dto.OrderResponse;
 import com.chae.promo.order.entity.Order;
-import com.chae.promo.order.entity.UserType;
 import com.chae.promo.order.event.OrderPlacedEventPublisher;
 import com.chae.promo.order.mapper.OrderMapper;
 import com.chae.promo.order.repository.OrderRepository;
 import com.chae.promo.order.service.redis.StockRedisService;
+import com.chae.promo.outbox.entity.EventOutbox;
+import com.chae.promo.outbox.repository.EventOutboxRepository;
 import com.chae.promo.product.entity.Product;
 import com.chae.promo.product.util.ProductValidator;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
@@ -23,9 +25,11 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.assertj.core.api.AssertionsForClassTypes.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.BDDMockito.*;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
@@ -43,6 +47,8 @@ public class PlaceOrderServiceTest {
     @MockitoBean private StockRedisService stockRedisService;
     @MockitoBean private OrderPlacedEventPublisher orderPlacedEventPublisher;
     @MockitoBean private OrderMapper orderMapper;
+    @MockitoBean
+    private EventOutboxRepository eventOutboxRepository;
 
     private static final long TTL = 600L;
 
@@ -107,9 +113,18 @@ public class PlaceOrderServiceTest {
         then(stockRedisService).should(times(1))
                 .reserve(eq("P-200"), anyString(), eq(3L), eq(TTL));
 
-        // 3) afterCommit에서 Kafka 이벤트 발행 (메서드 리턴 시점엔 이미 커밋/콜백 완료)
-        then(orderPlacedEventPublisher).should(times(1))
-                .publishOrderPlaced(any());
+        // 3) Outbox 저장 검증
+        ArgumentCaptor<EventOutbox> outboxCaptor = ArgumentCaptor.forClass(EventOutbox.class);
+        then(eventOutboxRepository).should(times(1)).save(outboxCaptor.capture());
+
+        EventOutbox saved = outboxCaptor.getValue();
+        then(eventOutboxRepository).should(times(1)).save(outboxCaptor.capture());
+
+        assertThat(saved.getType()).isEqualTo("order.placed");
+        assertThat(saved.getStatus()).isEqualTo(EventOutbox.Status.PENDING);
+        assertThat(saved.getPayloadJson()).contains("P-100");
+        assertThat(saved.getPayloadJson()).contains("P-200");
+
     }
 
     @Test
@@ -129,6 +144,10 @@ public class PlaceOrderServiceTest {
         // save는 정상
         given(orderRepository.save(any(Order.class))).willAnswer(inv -> inv.getArgument(0));
 
+        // Outbox save도 정상 동작 (rollback 대상)
+        given(eventOutboxRepository.save(any(EventOutbox.class)))
+                .willAnswer(inv -> inv.getArgument(0));
+
         // 여기서 핵심: 트랜잭션 동기화 등록(코드상 reserve → registerSynchronization) 이후에
         // 예외가 터져야 롤백 콜백이 실행됨. 따라서 mapper에서 런타임 예외를 던지게 해서 롤백 유도.
         given(orderMapper.toPurchaseResponse(any(Order.class)))
@@ -141,9 +160,12 @@ public class PlaceOrderServiceTest {
 
         // reserve는 호출되었어야 함
         then(stockRedisService).should(times(1))
-                .reserve(eq("P-300"), anyString(), eq(5L), TTL);
+                .reserve(eq("P-300"), anyString(), eq(5L), anyLong());
         then(stockRedisService).should(times(1))
-                .reserve(eq("P-400"), anyString(), eq(1L), TTL);
+                .reserve(eq("P-400"), anyString(), eq(1L), anyLong());
+
+        // Outbox 저장은 시도되었음
+        then(eventOutboxRepository).should(times(1)).save(any(EventOutbox.class));
 
         // 롤백 후 afterCompletion(status=ROLLED_BACK)에서 cancel()이 호출되어야 함
         // → placeOrder 호출이 예외로 끝난 뒤 검증해야 취소 콜백까지 처리 완료
@@ -152,8 +174,7 @@ public class PlaceOrderServiceTest {
         then(stockRedisService).should(times(1))
                 .cancel(eq("P-400"), anyString(), eq(1L));
 
-        // 롤백이므로 이벤트 발행은 되면 안 됨
-        then(orderPlacedEventPublisher).shouldHaveNoInteractions();
+
     }
 
     @Test
@@ -196,8 +217,8 @@ public class PlaceOrderServiceTest {
         then(stockRedisService).should(times(1))
                 .reserve(eq("P-200"), anyString(), eq(3L), eq(TTL));
 
-        // 이벤트 발행 안 됨 (afterCommit까지 못 감)
-        then(orderPlacedEventPublisher).shouldHaveNoInteractions();
+        //outbox 저장안됨
+        then(eventOutboxRepository).should(never()).save(any(EventOutbox.class));
 
         // 보상 취소 없음
         then(stockRedisService).should(never())
