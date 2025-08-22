@@ -4,7 +4,7 @@ import com.chae.promo.common.entity.BaseTime;
 import jakarta.persistence.*;
 import lombok.*;
 
-import java.time.Instant;
+import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "event_outbox")
@@ -47,7 +47,7 @@ public class EventOutbox extends BaseTime {
 
     @Setter
     @Column(nullable = false)
-    private Instant nextRetryAt;
+    private LocalDateTime nextRetryAt;
 
     @Setter
     @Column(length = 512)

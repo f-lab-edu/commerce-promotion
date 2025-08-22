@@ -7,7 +7,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.Instant;
+import java.time.Clock;
+import java.time.LocalDateTime;
 
 @Service
 @RequiredArgsConstructor
@@ -17,13 +18,13 @@ public class OutboxServiceImpl implements OutboxService {
 
     private final EventOutboxRepository eventOutboxRepository;
 
+    private final Clock clock;
+
     @Transactional
     @Override
     public void saveEvent(String eventId, String type, String aggregateId, Object payload) {
         try {
             String json = objectMapper.writeValueAsString(payload);
-            Instant now = Instant.now();
-
             EventOutbox eventOutbox = EventOutbox.builder()
                     .eventId(eventId)
                     .type(type)
@@ -31,7 +32,7 @@ public class OutboxServiceImpl implements OutboxService {
                     .payloadJson(json)
                     .status(EventOutbox.Status.PENDING)
                     .retryCount(0)
-                    .nextRetryAt(now)
+                    .nextRetryAt(LocalDateTime.now(clock))
                     .build();
 
             eventOutboxRepository.save(eventOutbox);

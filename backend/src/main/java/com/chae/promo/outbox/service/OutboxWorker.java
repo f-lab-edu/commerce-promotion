@@ -7,14 +7,13 @@ import com.chae.promo.outbox.repository.EventOutboxRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.Duration;
-import java.time.Instant;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Component
@@ -36,11 +35,16 @@ public class OutboxWorker {
         return Duration.ofSeconds(10L * Math.max(1, retryCount + 1));
     }
 
-    @Scheduled(fixedDelayString = "PT5S") // 5초마다 실행
+    @Scheduled(fixedDelayString = "PT30S") // 5초마다 실행
     @Transactional
     public void publishBatch() {
-        Instant now = Instant.now();
+        LocalDateTime now = LocalDateTime.now(clock);
         List<EventOutbox> rows = eventOutboxRepository.lockAndFetch(now, BATCH);
+
+        if (rows.isEmpty()) {
+             log.debug("[Outbox] no events to publish");
+            return;
+        }
 
         for (EventOutbox outbox : rows) {
             try {
@@ -55,7 +59,7 @@ public class OutboxWorker {
                 // 성공 업데이트
                 outbox.setStatus(EventOutbox.Status.SENT);
                 outbox.setLastError(null);
-                outbox.setNextRetryAt(Instant.now(clock));
+                outbox.setNextRetryAt(LocalDateTime.now(clock));
 
                 log.info("[Outbox] SENT type={}, eventId={}, aggregateId={}",
                         outbox.getType(), outbox.getEventId(), outbox.getAggregateId());
@@ -65,7 +69,7 @@ public class OutboxWorker {
                 int next = outbox.getRetryCount() + 1;
                 outbox.setStatus(EventOutbox.Status.FAILED); // 실패 상태로 두고 재시도
                 outbox.setRetryCount(next);
-                outbox.setNextRetryAt(Instant.now().plus(backoff(next)));
+                outbox.setNextRetryAt(LocalDateTime.now(clock).plus(backoff(next)));
                 outbox.setLastError(ex.getClass().getSimpleName() + ":" + ex.getMessage());
 
                 log.warn("[Outbox] FAIL type={}, eventId={}, retry={}, nextRetryAt={}, cause={}",
