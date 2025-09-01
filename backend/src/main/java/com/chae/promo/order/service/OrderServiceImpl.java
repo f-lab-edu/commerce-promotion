@@ -197,6 +197,20 @@ public class OrderServiceImpl implements OrderService {
         //배송 정보 저장
         createAndSaveShippingInfo(order, request.getShippingInfo());
 
+        // 재고 예약
+        String orderId = order.getPublicId();
+        reserveStockInRedis(request.getItems(), orderId);
+
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCompletion(int status) {
+                if( status == TransactionSynchronization.STATUS_ROLLED_BACK) {
+                    // 주문이 롤백되면 Redis 예약 취소
+                    cancelStockInRedisQuietly(request.getItems(), orderId);
+                }
+            }
+        });
+
         return OrderResponse.OrderSummary.builder()
                 .publicId(order.getPublicId())
                 .totalPrice(order.getTotalPrice())
@@ -275,7 +289,7 @@ public class OrderServiceImpl implements OrderService {
         if (items == null || items.isEmpty()) return "상품 없음";
 
         // 첫 상품명
-        Product first = productMap.get(items.get(0));
+        Product first = productMap.get(items.get(0).getProductCode());
         String firstName = (first != null && first.getName() != null) ? first.getName().trim() : "상품";
 
         // “외 N건” = (품목 수 - 1)

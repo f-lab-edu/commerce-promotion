@@ -2,18 +2,17 @@ package com.chae.promo.payment.service;
 
 import com.chae.promo.exception.CommonCustomException;
 import com.chae.promo.exception.CommonErrorCode;
+import com.chae.promo.order.dto.OrderResponse;
 import com.chae.promo.order.entity.Order;
 import com.chae.promo.order.entity.OrderStatus;
 import com.chae.promo.order.repository.OrderItemRepository;
 import com.chae.promo.order.repository.OrderRepository;
 import com.chae.promo.payment.dto.ApproveResult;
 import com.chae.promo.payment.dto.NaverPayApproveResponse;
-import com.chae.promo.payment.dto.PaymentRequest;
-import com.chae.promo.payment.dto.StartPaymentResponse;
+import com.chae.promo.payment.dto.PaymentApprove;
 import com.chae.promo.payment.entity.Payment;
 import com.chae.promo.payment.entity.PaymentMethod;
 import com.chae.promo.payment.entity.PaymentStatus;
-import com.chae.promo.payment.entity.PgType;
 import com.chae.promo.payment.pg.NaverPayClient;
 import com.chae.promo.payment.repository.PaymentRepository;
 import lombok.RequiredArgsConstructor;
@@ -32,37 +31,30 @@ public class PaymentServiceImpl implements PaymentService {
     private final NaverPayClient naver;
     private final OrderRepository orderRepository;
     private final PaymentRepository paymentRepository;
-    private final OrderItemRepository orderItemRepository;
 
     @Transactional
-    public StartPaymentResponse start(String orderId, PgType pgType) {
+    public OrderResponse.OrderSummary start(String orderId) {
         Order order = orderRepository.findByPublicId(orderId)
                 .orElseThrow(() -> new CommonCustomException(CommonErrorCode.ORDER_NOT_FOUND));
 
-        long totalQuantity = orderItemRepository.sumQuantityByOrderPublicId(order.getPublicId());
-
-        if (order.getStatus() == OrderStatus.PAID)
-            return new StartPaymentResponse(pgType, "ALREADY_PAID");
-
-
-        switch (pgType) {
-            case NAVERPAY -> {
-                String reserveId = naver.reserve(order.getPublicId(), order.getTotalPrice(),
-                        order.getProductName(), totalQuantity);
-
-                order.markPendingPayment();
-                orderRepository.save(order);
-
-                return new StartPaymentResponse(pgType,reserveId);
-            }
-
-            default -> throw new CommonCustomException(CommonErrorCode.PAYMENT_NOT_SUPPORTED_PG_TYPE);
+        if(order.getStatus() != OrderStatus.CREATED){
+            log.warn("결제 불가능한 상태: {}, 주문 ID: {}", order.getStatus(), order.getPublicId());
+            throw new CommonCustomException(CommonErrorCode.PAYMENT_NOT_ALLOWED_STATE);
         }
+
+        order.markPendingPayment();
+
+        return OrderResponse.OrderSummary.builder()
+                .publicId(order.getPublicId())
+                .itemCount(order.getOrderItems().size())
+                .totalPrice(order.getTotalPrice())
+                .status(order.getStatus().name())
+                .build();
 
     }
 
     @Transactional
-    public ApproveResult approve(PaymentRequest request, String userId) {
+    public ApproveResult approve(PaymentApprove request, String userId) {
         String paymentId = request.getPaymentId();
 
         Order order = orderRepository.findByPublicId(request.getOrderId())

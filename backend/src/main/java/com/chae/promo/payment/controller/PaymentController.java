@@ -1,7 +1,9 @@
 package com.chae.promo.payment.controller;
 
+import com.chae.promo.order.dto.OrderResponse;
 import com.chae.promo.payment.dto.ApproveResult;
-import com.chae.promo.payment.dto.PaymentRequest;
+import com.chae.promo.payment.dto.PaymentPrepare;
+import com.chae.promo.payment.dto.PaymentApprove;
 import com.chae.promo.payment.service.PaymentService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -23,14 +25,24 @@ public class PaymentController {
 
     private final PaymentService paymentService;
 
-    @PostMapping
-    @Operation(summary = "결제 요청")
-    public ResponseEntity<ApproveResult> requestPayment(
-            @RequestBody @Valid PaymentRequest request,
+    @PostMapping("/approve")
+    @Operation(summary = "결제 승인")
+    public ResponseEntity<ApproveResult> approvePayment(
+            @RequestBody @Valid PaymentApprove request,
             @AuthenticationPrincipal UserDetails userDetails
     ) {
 
         ApproveResult result = paymentService.approve(request, userDetails.getUsername());
+        return ResponseEntity.ok(result);
+    }
+
+    @PostMapping("/prepare")
+    @Operation(summary = "결제 준비")
+    public ResponseEntity<OrderResponse.OrderSummary> prepare(
+            @RequestBody @Valid PaymentPrepare request
+    ) {
+
+        OrderResponse.OrderSummary result = paymentService.start(request.getOrderId());
         return ResponseEntity.ok(result);
     }
 

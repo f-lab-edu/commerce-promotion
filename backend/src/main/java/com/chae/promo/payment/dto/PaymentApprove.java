@@ -10,7 +10,7 @@ import lombok.*;
 @AllArgsConstructor
 @NoArgsConstructor
 @Builder
-public class PaymentRequest {
+public class PaymentApprove {
 
     @NotBlank
     private String orderId; // 주문 ID
