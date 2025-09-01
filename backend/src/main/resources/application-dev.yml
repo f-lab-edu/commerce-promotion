@@ -48,4 +48,19 @@ logging:
   level:
     org.springframework.web: DEBUG
     org.hibernate.SQL: DEBUG
-    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE # SQL 바인딩 값 로깅
+    org.springframework.transaction: DEBUG # 트랜잭션 관련 로깅
+    org.springframework.orm.jpa.JpaTransactionManager: DEBUG # JPA 트랜잭션 관련 로깅
+    org.springframework.retry: DEBUG
+    org.apache.kafka: WARN
+    org.apache.kafka.clients: WARN
+    org.apache.kafka.clients.consumer: WARN
+    org.apache.kafka.common.utils.AppInfoParser: WARN
+    org.springframework.kafka: WARN
+    org.springframework.kafka.listener: WARN
+    org.springframework.kafka.core: WARN
+
+app:
+  redis:
+    prefix: promo:dev
+    use-hashtag: true # Redis 해시태그 사용 설정
