@@ -9,7 +9,8 @@ import lombok.Getter;
 @AllArgsConstructor
 public enum PaymentMethod {
     CARD("CARD"),
-    BANK("BANK")
+    BANK("BANK"),
+    COUPON("COUPON"),
     ;
     private final String method;
 

@@ -2,7 +2,7 @@ package com.chae.promo.payment.controller;
 
 import com.chae.promo.order.dto.OrderResponse;
 import com.chae.promo.payment.dto.ApproveResult;
-import com.chae.promo.payment.dto.PaymentPrepare;
+import com.chae.promo.payment.dto.PaymentPrepareRequest;
 import com.chae.promo.payment.dto.PaymentApprove;
 import com.chae.promo.payment.service.PaymentService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -39,10 +39,11 @@ public class PaymentController {
     @PostMapping("/prepare")
     @Operation(summary = "결제 준비")
     public ResponseEntity<OrderResponse.OrderSummary> prepare(
-            @RequestBody @Valid PaymentPrepare request
+            @RequestBody @Valid PaymentPrepareRequest request,
+            @AuthenticationPrincipal UserDetails userDetails
     ) {
 
-        OrderResponse.OrderSummary result = paymentService.start(request.getOrderId());
+        OrderResponse.OrderSummary result = paymentService.prepare(request, userDetails.getUsername());
         return ResponseEntity.ok(result);
     }
 
