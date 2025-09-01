@@ -34,6 +34,4 @@ public class PaymentController {
         return ResponseEntity.ok(result);
     }
 
-
-
 }

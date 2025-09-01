@@ -23,7 +23,7 @@ public class NaverPayClient {
     @Value("${naverpay.partner-id}") String partnerId;
     @Value("${naverpay.client-id}") String clientId;
     @Value("${naverpay.client-secret}") String clientSecret;
-    @Value("${naverpay.return-url}") String returnUrl;
+//    @Value("${naverpay.return-url}") String returnUrl;
 
     private Consumer<HttpHeaders> auth(String idem) {
         return h -> {
@@ -41,8 +41,8 @@ public class NaverPayClient {
                 "merchantUserKey", "U-" + orderKey,
                 "productName", title,
                 "productCount", quantity,
-                "totalPayAmount", amount,
-                "returnUrl", returnUrl
+                "totalPayAmount", amount
+//                "returnUrl", returnUrl
         );
         Map<?,?> resp = client.post()
                 .uri("/" + partnerId + "/naverpay/payments/v2/reserve")

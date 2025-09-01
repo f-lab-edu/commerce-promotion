@@ -5,12 +5,12 @@ import com.chae.promo.common.util.UuidUtil;
 import com.chae.promo.exception.CommonCustomException;
 import com.chae.promo.order.dto.OrderRequest;
 import com.chae.promo.order.dto.OrderResponse;
+import com.chae.promo.order.dto.PurchaseItemDTO;
 import com.chae.promo.order.entity.*;
 import com.chae.promo.order.event.OrderPlacedEvent;
 import com.chae.promo.order.mapper.OrderMapper;
 import com.chae.promo.order.repository.OrderRepository;
 import com.chae.promo.order.repository.ShippingInfoRepository;
-import com.chae.promo.order.service.redis.StockRedisKeyManager;
 import com.chae.promo.order.service.redis.StockRedisService;
 import com.chae.promo.outbox.service.OutboxService;
 import com.chae.promo.product.entity.Product;
@@ -81,8 +81,8 @@ public class OrderServiceImpl implements OrderService {
         try {
             return productValidator.getAndValidateProductMap(
                     request.getItems(),
-                    OrderRequest.PurchaseItem::getProductCode,
-                    OrderRequest.PurchaseItem::getQuantity
+                    PurchaseItemDTO::getProductCode,
+                    PurchaseItemDTO::getQuantity
             );
 
         } catch (CommonCustomException e) {
@@ -101,7 +101,7 @@ public class OrderServiceImpl implements OrderService {
 
         BigDecimal totalPrice = BigDecimal.ZERO;
 
-        for (OrderRequest.PurchaseItem item : request.getItems()) {
+        for (PurchaseItemDTO item : request.getItems()) {
             Product product = productMap.get(item.getProductCode());
 
             OrderItem orderItem = OrderItem.builder()
@@ -123,8 +123,8 @@ public class OrderServiceImpl implements OrderService {
         return orderRepository.save(order);
     }
 
-    private void reserveStockInRedis(List<OrderRequest.PurchaseItem> items, String orderId){
-        for (OrderRequest.PurchaseItem item : items) {
+    private void reserveStockInRedis(List<PurchaseItemDTO> items, String orderId){
+        for (PurchaseItemDTO item : items) {
             long requestedQuantity = item.getQuantity();
 
             try {
@@ -169,7 +169,7 @@ public class OrderServiceImpl implements OrderService {
         );
     }
 
-    private void cancelStockInRedisQuietly(List<OrderRequest.PurchaseItem> items, String orderId) {
+    private void cancelStockInRedisQuietly(List<PurchaseItemDTO> items, String orderId) {
         for (var item : items) {
             try {
                 stockRedisService.cancel(item.getProductCode(), orderId);
