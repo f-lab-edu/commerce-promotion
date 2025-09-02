@@ -55,11 +55,13 @@ public class PlaceOrderServiceTest {
 
 
     private OrderRequest.Purchase mockRequest(String code1, long qty1, String code2, long qty2) {
+
         PurchaseItemDTO i1 = mock(PurchaseItemDTO.class);
         given(i1.getProductCode()).willReturn(code1);
         given(i1.getQuantity()).willReturn(qty1);
 
         PurchaseItemDTO i2 = mock(PurchaseItemDTO.class);
+
         given(i2.getProductCode()).willReturn(code2);
         given(i2.getQuantity()).willReturn(qty2);
 

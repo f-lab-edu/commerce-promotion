@@ -1,5 +1,6 @@
 package com.chae.promo.order.service;
 
+import com.chae.promo.common.kafka.TopicNames;
 import com.chae.promo.common.util.UuidUtil;
 import com.chae.promo.exception.CommonCustomException;
 import com.chae.promo.order.dto.OrderRequest;
@@ -10,6 +11,7 @@ import com.chae.promo.order.mapper.OrderMapper;
 import com.chae.promo.order.repository.OrderRepository;
 import com.chae.promo.order.repository.ShippingInfoRepository;
 import com.chae.promo.order.service.redis.StockRedisService;
+import com.chae.promo.outbox.service.OutboxService;
 import com.chae.promo.product.entity.Product;
 import com.chae.promo.product.util.ProductValidator;
 import jakarta.transaction.Transactional;
@@ -33,6 +35,7 @@ public class OrderServiceImpl implements OrderService {
     private final OrderMapper orderMapper;
     private static final long redisHoldTtlSec = 60 * 10; // 10분 TTL
     private final ShippingInfoRepository shippingInfoRepository;
+
 
     @Transactional
     @Override
@@ -61,7 +64,6 @@ public class OrderServiceImpl implements OrderService {
                 }
             }
         });
-
 
         return orderMapper.toPurchaseResponse(order);
     }
@@ -129,6 +131,7 @@ public class OrderServiceImpl implements OrderService {
                 log.error("Redis 재고 차감 중 예상치 못한 오류 발생. orderId:{}, e: {}",
                         orderId, e);
                 throw new RuntimeException("Redis 재고 예약 중 알 수 없는 오류가 발생했습니다.");
+
             }
         }
     }
@@ -272,6 +275,7 @@ public class OrderServiceImpl implements OrderService {
         if (s == null || max <= 0) return "";
         int end = s.offsetByCodePoints(0, Math.min(max, s.codePointCount(0, s.length())));
         return s.substring(0, end); // count<=max면 end == s.length()
+
     }
 
 }

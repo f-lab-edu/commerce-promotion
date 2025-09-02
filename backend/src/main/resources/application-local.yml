@@ -66,3 +66,4 @@ naverpay:
   partner-id: naverpay-partner
   client-id: ${NAVERPAY_CLIENT_ID}
   client-secret: ${NAVERPAY_CLIENT_SECRET}
+
