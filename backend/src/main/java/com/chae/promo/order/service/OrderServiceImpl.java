@@ -60,7 +60,7 @@ public class OrderServiceImpl implements OrderService {
         reserveStockInRedis(request.getItems(), orderId);
 
         //outbox 이벤트 큐에 주문 완료 이벤트 저장 - 같은 트랜잭션 내
-        enqueueOrderPlacedOutbox(order, request, userId, userType);
+//        enqueueOrderPlacedOutbox(order, request, userId, userType);
 
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override

@@ -56,8 +56,8 @@ public class OrderPlacedHandlerService {
             //상품 재고 변경 및 audit 기록
             applyStockChangeAndSaveAudit(event, itemList, productMap);
 
-            //order 상태 변경 (PENDING_PAYMENT)
-            markOrderPendingPayment(event.getOrderPublicId());
+//            //order 상태 변경 (PENDING_PAYMENT)
+//            markOrderPendingPayment(event.getOrderPublicId());
 
             //redis 재고 확정
             confirmStockInRedis(itemList, event.getOrderPublicId());
