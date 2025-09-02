@@ -40,4 +40,12 @@ public class Payment extends BaseTime{
 
     @Column(name = "paid_at")
     private LocalDateTime paidAt;
+
+    public void markPaid(String paymentKey, PaymentMethod paymentMethod, LocalDateTime paidAt) {
+        this.status = PaymentStatus.COMPLETED;
+        this.paymentKey = paymentKey;
+        this.paymentMethod = paymentMethod;
+        this.paidAt = paidAt;
+    }
+
 }

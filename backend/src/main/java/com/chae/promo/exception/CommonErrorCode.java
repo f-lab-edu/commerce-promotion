@@ -38,6 +38,8 @@ public enum CommonErrorCode {
     PAYMENT_NOT_SUPPORTED_PG_TYPE(HttpStatus.NOT_FOUND, "PAYMENT_NOT_SUPPORTED_PG_TYPE", "지원하지 않는 결제 PG 타입입니다."),
     ALREADY_PAID(HttpStatus.NOT_FOUND, "ALREADY_PAID", "이미 결제된 주문입니다."),
     DUPLICATED_PAYMENT_METHOD(HttpStatus.NOT_FOUND, "DUPLICATED_PAYMENT_METHOD", "중복된 결제 수단이 포함되어 있습니다."),
+    PAYMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "PAYMENT_NOT_FOUND", "결제 정보를 찾을 수 없습니다."),
+
 
     //redis
     REDIS_OPERATION_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "REDIS_OPERATION_FAILED", "Redis 작업 중 오류가 발생했습니다."),

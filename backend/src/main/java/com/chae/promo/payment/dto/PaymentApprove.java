@@ -15,9 +15,6 @@ public class PaymentApprove {
     @NotBlank
     private String orderId; // 주문 ID
 
-    @NotNull
-    private PgType pgType; // 결제 수단 (예: NAVERPAY, KAKAO_PAY 등)
-
     @NotBlank
     private String paymentId; // 결제 ID (PG사에서 발급한 고유 ID)
 }
