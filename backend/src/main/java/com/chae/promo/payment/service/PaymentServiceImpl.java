@@ -21,16 +21,12 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 
 @Slf4j
 @Service
@@ -50,9 +46,6 @@ public class PaymentServiceImpl implements PaymentService {
 
         //결제 가능 상태인지, 주문자와 결제자가 일치하는지 검증
         validateOrderForPayment(order, userId);
-
-//        //중복된 결제 수단이 있는지 검증
-//        validatePaymentMethod(request.payments());
 
         //결제 금액이 주문 금액과 일치하는지 검증
         validatePaymentAmount(order, request.paymentMethod());
@@ -108,31 +101,6 @@ public class PaymentServiceImpl implements PaymentService {
         }
 
     }
-
-    //중복된 결제 수단이 있는지 검증
-    private void validatePaymentMethod(List<PaymentMethodRequest> request) {
-        Set<PaymentMethod> methods = new HashSet<>();
-        for (PaymentMethodRequest req : request) {
-            if (!methods.add(req.method())) {
-                throw new CommonCustomException(CommonErrorCode.DUPLICATED_PAYMENT_METHOD);
-            }
-        }
-    }
-
-//    //결제 정보 생성 및 저장
-//    private void createAndSavePayments(Order order, PaymentPrepareRequest request) {
-//
-//        List<Payment> payments = request.payments().stream()
-//                .map(paymentMethod -> Payment.builder()
-//                        .order(order)
-//                        .paymentMethod(paymentMethod.method())
-//                        .amount(paymentMethod.amount())
-//                        .status(PaymentStatus.PENDING)
-//                        .build()
-//                ).toList();
-//
-//        paymentRepository.saveAll(payments);
-//    }
 
     private void createAndSavePayment(Order order, PaymentPrepareRequest request) {
 
