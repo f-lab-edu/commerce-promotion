@@ -24,7 +24,7 @@ public class Payment extends BaseTime{
     @JoinColumn(name = "order_id", unique = true, nullable = false)
     private Order order;
 
-    @Column(name = "payment_key", unique = true, nullable = false)
+    @Column(name = "payment_key", unique = true)
     private String paymentKey;
 
     @Enumerated(EnumType.STRING)
