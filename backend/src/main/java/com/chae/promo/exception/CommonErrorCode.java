@@ -30,6 +30,15 @@ public enum CommonErrorCode {
     PRODUCT_STOCK_AUDIT_SAVE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "PRODUCT_STOCK_AUDIT_SAVE_FAILED", "상품 재고 감사 기록을 저장하는 중 오류가 발생했습니다."),
     INVALID_QUANTITY(HttpStatus.BAD_REQUEST, "INVALID_QUANTITY", "유효하지않은 수량입니다."),
     ORDER_NOT_FOUND(HttpStatus.NOT_FOUND, "ORDER_NOT_FOUND", "해당 주문을 찾을 수 없습니다."),
+    NOT_ALLOWED(HttpStatus.NOT_FOUND, "NOT_ALLOWED", "접근 권한이 없습니다."),
+    PAYMENT_NOT_ALLOWED_STATE(HttpStatus.NOT_FOUND, "PAYMENT_NOT_ALLOWED_STATE", "결제할 수 없는 주문 상태입니다."),
+    PAYMENT_APPROVAL_FAILED(HttpStatus.NOT_FOUND, "PAYMENT_APPROVAL_FAILED", "결제 승인에 실패했습니다."),
+    PAYMENT_AMOUNT_MISMATCH(HttpStatus.NOT_FOUND, "PAYMENT_AMOUNT_MISMATCH", "결제 금액이 주문 금액과 일치하지 않습니다."),
+    PAYMENT_ORDER_MISMATCH(HttpStatus.NOT_FOUND, "PAYMENT_ORDER_MISMATCH", "결제 주문 정보가 일치하지 않습니다."),
+    PAYMENT_NOT_SUPPORTED_PG_TYPE(HttpStatus.NOT_FOUND, "PAYMENT_NOT_SUPPORTED_PG_TYPE", "지원하지 않는 결제 PG 타입입니다."),
+    ALREADY_PAID(HttpStatus.NOT_FOUND, "ALREADY_PAID", "이미 결제된 주문입니다."),
+    DUPLICATED_PAYMENT_METHOD(HttpStatus.NOT_FOUND, "DUPLICATED_PAYMENT_METHOD", "중복된 결제 수단이 포함되어 있습니다."),
+    PAYMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "PAYMENT_NOT_FOUND", "결제 정보를 찾을 수 없습니다."),
 
 
     //redis

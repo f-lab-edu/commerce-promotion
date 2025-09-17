@@ -5,13 +5,11 @@ import com.chae.promo.common.util.UuidUtil;
 import com.chae.promo.exception.CommonCustomException;
 import com.chae.promo.order.dto.OrderRequest;
 import com.chae.promo.order.dto.OrderResponse;
-import com.chae.promo.order.entity.Order;
-import com.chae.promo.order.entity.OrderItem;
-import com.chae.promo.order.entity.OrderStatus;
-import com.chae.promo.order.entity.UserType;
-import com.chae.promo.order.event.OrderPlacedEvent;
+import com.chae.promo.order.dto.PurchaseItemDTO;
+import com.chae.promo.order.entity.*;
 import com.chae.promo.order.mapper.OrderMapper;
 import com.chae.promo.order.repository.OrderRepository;
+import com.chae.promo.order.repository.ShippingInfoRepository;
 import com.chae.promo.order.service.redis.StockRedisService;
 import com.chae.promo.outbox.service.OutboxService;
 import com.chae.promo.product.entity.Product;
@@ -36,8 +34,7 @@ public class OrderServiceImpl implements OrderService {
     private final ProductValidator productValidator;
     private final OrderMapper orderMapper;
     private static final long redisHoldTtlSec = 60 * 10; // 10분 TTL
-
-    private final OutboxService outboxService;
+    private final ShippingInfoRepository shippingInfoRepository;
 
 
     @Transactional
@@ -45,7 +42,6 @@ public class OrderServiceImpl implements OrderService {
     public OrderResponse.Purchase placeOrder(OrderRequest.Purchase request, String userId) {
 
         //현재 비회원명 임시 사용
-        UserType userType = UserType.GUEST;
         String ordererName = "비회원 " + userId;
 
         //상품 유효성 검증
@@ -59,9 +55,6 @@ public class OrderServiceImpl implements OrderService {
         String orderId = order.getPublicId();
         reserveStockInRedis(request.getItems(), orderId);
 
-        //outbox 이벤트 큐에 주문 완료 이벤트 저장 - 같은 트랜잭션 내
-        enqueueOrderPlacedOutbox(order, request, userId, userType);
-
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
             public void afterCompletion(int status) {
@@ -72,7 +65,6 @@ public class OrderServiceImpl implements OrderService {
             }
         });
 
-
         return orderMapper.toPurchaseResponse(order);
     }
 
@@ -81,8 +73,8 @@ public class OrderServiceImpl implements OrderService {
         try {
             return productValidator.getAndValidateProductMap(
                     request.getItems(),
-                    OrderRequest.PurchaseItem::getProductCode,
-                    OrderRequest.PurchaseItem::getQuantity
+                    PurchaseItemDTO::getProductCode,
+                    PurchaseItemDTO::getQuantity
             );
 
         } catch (CommonCustomException e) {
@@ -101,7 +93,7 @@ public class OrderServiceImpl implements OrderService {
 
         BigDecimal totalPrice = BigDecimal.ZERO;
 
-        for (OrderRequest.PurchaseItem item : request.getItems()) {
+        for (PurchaseItemDTO item : request.getItems()) {
             Product product = productMap.get(item.getProductCode());
 
             OrderItem orderItem = OrderItem.builder()
@@ -123,8 +115,8 @@ public class OrderServiceImpl implements OrderService {
         return orderRepository.save(order);
     }
 
-    private void reserveStockInRedis(List<OrderRequest.PurchaseItem> items, String orderId){
-        for (OrderRequest.PurchaseItem item : items) {
+    private void reserveStockInRedis(List<PurchaseItemDTO> items, String orderId){
+        for (PurchaseItemDTO item : items) {
             long requestedQuantity = item.getQuantity();
 
             try {
@@ -139,37 +131,12 @@ public class OrderServiceImpl implements OrderService {
                 log.error("Redis 재고 차감 중 예상치 못한 오류 발생. orderId:{}, e: {}",
                         orderId, e);
                 throw new RuntimeException("Redis 재고 예약 중 알 수 없는 오류가 발생했습니다.");
+
             }
         }
     }
 
-    private void enqueueOrderPlacedOutbox(Order order, OrderRequest.Purchase request, String userId, UserType userType) {
-        List<OrderPlacedEvent.Item> eventItems = request.getItems().stream()
-                .map(item -> OrderPlacedEvent.Item.builder()
-                        .productCode(item.getProductCode())
-                        .decreasedStock(item.getQuantity())
-                        .build())
-                .toList();
-
-        String eventId = UuidUtil.generate();
-
-        OrderPlacedEvent event = OrderPlacedEvent.builder()
-                .eventId(eventId)
-                .userId(userId)
-                .userType(userType)
-                .orderPublicId(order.getPublicId())
-                .items(eventItems)
-                .build();
-
-        outboxService.saveEvent(
-                eventId,
-                TopicNames.ORDER_PLACED,
-                order.getPublicId(),
-                event
-        );
-    }
-
-    private void cancelStockInRedisQuietly(List<OrderRequest.PurchaseItem> items, String orderId) {
+    private void cancelStockInRedisQuietly(List<PurchaseItemDTO> items, String orderId) {
         for (var item : items) {
             try {
                 stockRedisService.cancel(item.getProductCode(), orderId);
@@ -179,6 +146,136 @@ public class OrderServiceImpl implements OrderService {
                         item.getProductCode(), orderId, ex.toString());
             }
         }
+    }
+
+
+    @Transactional
+    @Override
+    public OrderResponse.OrderSummary createOrder(OrderRequest.Create request, String userId) {
+        //현재 비회원명 임시 사용
+        String ordererName = "비회원 " + userId;
+
+        //상품 유효성 검증
+        Map<String, Product> productMap = validateAndGetProductMap(request);
+
+        //주문 생성 및 저장
+        Order order = createAndSaveOrder(request, ordererName, productMap);
+
+        //배송 정보 저장
+        createAndSaveShippingInfo(order, request.getShippingInfo());
+
+        // 재고 예약
+        String orderId = order.getPublicId();
+        reserveStockInRedis(request.getItems(), orderId);
+
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCompletion(int status) {
+                if( status == TransactionSynchronization.STATUS_ROLLED_BACK) {
+                    // 주문이 롤백되면 Redis 예약 취소
+                    cancelStockInRedisQuietly(request.getItems(), orderId);
+                }
+            }
+        });
+
+        return OrderResponse.OrderSummary.builder()
+                .publicId(order.getPublicId())
+                .totalPrice(order.getTotalPrice())
+                .status(order.getStatus().name())
+                .itemCount(order.getOrderItems().size())
+                .build();
+    }
+
+    private Map<String, Product> validateAndGetProductMap(OrderRequest.Create request){
+        // 요청된 상품 코드로 Product 엔티티를 한번에 조회하고, Map으로 변환
+        try {
+            return productValidator.getAndValidateProductMap(
+                    request.getItems(),
+                    PurchaseItemDTO::getProductCode,
+                    PurchaseItemDTO::getQuantity
+            );
+
+        } catch (CommonCustomException e) {
+            log.warn("상품 유효성 검증 실패: {}", e.getMessage());
+            throw e;
+        }
+    }
+
+    private Order createAndSaveOrder(OrderRequest.Create request, String ordererName, Map<String, Product> productMap){
+        String productName = extractProductName(request.getItems(), productMap);
+
+        Order order = Order.builder()
+                .customerId(null)
+                .ordererName(ordererName)
+                .publicId(UuidUtil.generate())
+                .status(OrderStatus.CREATED) // 초기 상태는 주문 생성
+                .productName(productName)
+                .build();
+
+        BigDecimal totalPrice = BigDecimal.ZERO;
+
+        for (PurchaseItemDTO item : request.getItems()) {
+            Product product = productMap.get(item.getProductCode());
+
+            OrderItem orderItem = OrderItem.builder()
+                    .product(product)
+                    .quantity(item.getQuantity())
+                    .unitPrice(product.getPrice())
+                    .build();
+
+            order.addOrderItem(orderItem);
+
+            //총 금액 계산 (단가 * 수량)
+            totalPrice = totalPrice.add(
+                    product.getPrice().multiply(new BigDecimal(item.getQuantity()))
+            );
+        }
+
+        order.updateTotalPrice(totalPrice);
+
+        return orderRepository.save(order);
+    }
+
+    private ShippingInfo createAndSaveShippingInfo(Order order, OrderRequest.ShippingInfo shippingInfoRequest) {
+        ShippingInfo shippingInfo = ShippingInfo.builder()
+                .order(order)
+                .recipientName(shippingInfoRequest.getRecipientName())
+                .zipcode(shippingInfoRequest.getZipcode())
+                .address(shippingInfoRequest.getAddress())
+                .phoneNumber(shippingInfoRequest.getPhoneNumber())
+                .memo(shippingInfoRequest.getMemo())
+                .build();
+
+        return shippingInfoRepository.save(shippingInfo);
+    }
+
+    // 주문 상품명 추출 및 가공
+    private String extractProductName(List<PurchaseItemDTO> items, Map<String, Product> productMap) {
+        int PRODUCT_NAME_LIMIT = 100;
+
+        if (items == null || items.isEmpty()) return "상품 없음";
+
+        // 첫 상품명
+        Product first = productMap.get(items.get(0).getProductCode());
+        String firstName = (first != null && first.getName() != null) ? first.getName().trim() : "상품";
+
+        // “외 N건” = (품목 수 - 1)
+        int extra = Math.max(0, items.size() - 1);
+        String suffix = (extra > 0) ? " 외 " + extra + "건" : "";
+
+        // 100자 제한
+        int baseLimit = Math.max(0, PRODUCT_NAME_LIMIT - suffix.codePointCount(0, suffix.length()));
+        String head = limitByCodePoints(firstName, baseLimit);
+        String name = head + suffix;
+
+        return name;
+    }
+
+    private static String limitByCodePoints(String s, int max) {
+        if (s == null || max <= 0) return "";
+        int end = s.offsetByCodePoints(0, Math.min(max, s.codePointCount(0, s.length())));
+        return s.substring(0, end); // count<=max면 end == s.length()
+
     }
 
 }

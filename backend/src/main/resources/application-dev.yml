@@ -64,3 +64,10 @@ app:
   redis:
     prefix: promo:dev
     use-hashtag: true # Redis 해시태그 사용 설정
+
+naverpay:
+  base-url: https://dev-pub.apis.naver.com
+  partner-id: naverpay-partner
+  client-id: ${NAVERPAY_CLIENT_ID}
+  client-secret: ${NAVERPAY_CLIENT_SECRET}
+
