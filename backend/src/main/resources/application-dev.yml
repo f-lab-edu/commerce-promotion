@@ -9,7 +9,7 @@ spring:
     password: ${DB_PASS}
     driver-class-name: com.mysql.cj.jdbc.Driver
     hikari:
-      maximum-pool-size: 10
+      maximum-pool-size: 50
       leak-detection-threshold: 2000 # 2초
 
   data:
@@ -17,6 +17,12 @@ spring:
       host: ${REDIS_HOST}
       port: ${REDIS_PORT}
       password: ${REDIS_PASS}
+      lettuce:
+        pool:
+          max-active: 800   # 동시에 빌릴 수 있는 커넥션 수 (TPS 맞춰서 조정)
+          max-idle: 200      # 풀에 유지할 수 있는 최대 idle 커넥션
+          min-idle: 50     # 최소 유지 idle 커넥션
+          max-wait: 500ms   # 풀에 여유 없을 때 대기 시간
 
   jpa:
     hibernate:
@@ -86,3 +92,9 @@ naverpay:
   client-id: ${NAVERPAY_CLIENT_ID}
   client-secret: ${NAVERPAY_CLIENT_SECRET}
 
+server:
+  tomcat:
+    threads:
+      max: 500         # 동시에 처리할 수 있는 최대 worker thread
+      min-spare: 50    # 최소 여유 thread
+    connection-timeout: 5s   # 커넥션 timeout
