@@ -9,4 +9,6 @@ public final class TopicNames {
 
     public static final String ORDER_PLACED = "order.placed";
 
+    public static final String EVENT_OPEN = "event.open";
+
 }
