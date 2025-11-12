@@ -21,6 +21,7 @@ public class SseEmitterManager {
         emitters.put(clientId, emitter);
         emitter.onCompletion(() -> emitters.remove(clientId));
         emitter.onTimeout(() -> emitters.remove(clientId));
+        emitter.onError(ex -> emitters.remove(clientId));
         return emitter;
     }
 
